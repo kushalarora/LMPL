@@ -1,9 +1,8 @@
 setuptools
 cython==0.29.14
-comet_ml==3.1.11
+# comet_ml==3.1.11
 numpy==1.18.1
 spacy==2.2.0
-https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-2.2.0/en_core_web_sm-2.2.0.tar.gz
 transformers==2.11.0
 sacrebleu==1.4.4
 torch==1.5.1
