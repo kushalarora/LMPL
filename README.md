@@ -1,2 +1,1 @@
-# lmpl
-Language Modeling as a Policy Learning library.
+# Language Modeling as a Policy Learning (LMPL, pronounced lample) library.
