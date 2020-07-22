@@ -14,7 +14,7 @@ with open("requirements.txt") as requirements_file:
         """Pip and setuptools disagree about how URL dependencies should be handled."""
         m = re.match(
             r"^(git\+)?(https|ssh)://(git@)?github\.com/([\w-]+)/(?P<name>[\w-]+)\.git", req
-        )
+        )  
         if m is None:
             return req
         else:
@@ -42,15 +42,12 @@ setup(
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
     ],
     keywords="allennlp NLP deep learning language modeling",
-    url="https://github.com/kushalarora/lmpl",
+    url="https://github.com/kushalarora/LMPL",
     author="Kushal Arora",
     author_email="kushal.arora@mail.mcgill.ca",
     license="MIT",
     packages=find_packages(exclude=["*.tests", "*.tests.*", "tests.*", "tests"],),
-    install_requires=[
-      "allennlp>=1.0.0, <1.1.0",
-      "allennlp-models>=1.0.0, <1.1.0",
-    ],
+    install_requires=install_requirements,
     include_package_data=True,
     python_requires=">=3.7",
     zip_safe=False,
