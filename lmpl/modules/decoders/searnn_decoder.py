@@ -209,7 +209,7 @@ class QuantExpSEARNNDecoder(QuantExpAutoRegressiveSeqDecoder):
         targets_plus_1 = None
         if target_tokens is not None:
             # targets Shape: (batch_size, num_decoding_steps + 1)
-            targets = target_tokens['tokens']
+            targets = util.get_token_ids_from_text_field_tensors(target_tokens)
 
             # targets_plus_1 Shape: (batch_size, num_decoding_steps + 2)
             targets_plus_1 = torch.cat([targets, targets[:, -1].unsqueeze(1)], dim=-1)
@@ -252,7 +252,9 @@ class QuantExpSEARNNDecoder(QuantExpAutoRegressiveSeqDecoder):
                 if target_tokens is not None:
                     left_context = min(step, num_neighbors_to_add//2)
                     right_context = min(num_decoding_steps - step, num_neighbors_to_add - left_context)
-                    neighbor_tokens = target_tokens['tokens'][:, step-left_context: step+right_context]
+                    
+                    targets = util.get_token_ids_from_text_field_tensors(target_tokens)
+                    neighbor_tokens = targets[:, step-left_context: step+right_context]
 
                     masked_step_logits = masked_step_logits.scatter_(dim=1,
                                                                     index=neighbor_tokens,
@@ -298,7 +300,7 @@ class QuantExpSEARNNDecoder(QuantExpAutoRegressiveSeqDecoder):
             target_prefixes = None
             if targets_plus_1 is not None:
                 # targets Shape: (batch_size, num_decoding_steps + 1)
-                targets = target_tokens['tokens']
+                targets = util.get_token_ids_from_text_field_tensors(target_tokens)
                 target_len = targets_plus_1.size(1)
 
                 targets_expanded = targets_plus_1 \
