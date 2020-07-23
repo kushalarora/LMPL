@@ -2,7 +2,7 @@
 # Installation:
 ```python setup.py --editable```
 
-##Download spacy model:
+## Download spacy model:
 
 ```python -m spacy download en```
 
