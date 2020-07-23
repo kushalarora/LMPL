@@ -10,10 +10,10 @@ from allennlp.modules import TextFieldEmbedder, Seq2SeqEncoder, Embedding
 from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
 from allennlp.nn import util, InitializerApplicator, RegularizerApplicator
 
-from quant_exp_bias.modules.decoders.seq_decoder import SeqDecoder
+from lmpl.modules.decoders.seq_decoder import SeqDecoder
 
 
-@Model.register("quant_exp_composed_lm")
+@Model.register("lmpl_composed_lm")
 class ComposedLMBase(Model):
     """
     This ``ComposedSeq2Seq`` class is a :class:`Model` which takes a sequence, encodes it, and then

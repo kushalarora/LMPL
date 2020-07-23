@@ -10,7 +10,7 @@ import time
 from typing import List
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 
-from quant_exp_bias.oracles.oracle_base import Oracle
+from lmpl.oracles.oracle_base import Oracle
 from multiprocessing import Pool
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name

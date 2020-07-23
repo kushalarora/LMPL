@@ -11,15 +11,15 @@ from allennlp.data.vocabulary import Vocabulary, DEFAULT_OOV_TOKEN, DEFAULT_PADD
 from allennlp.modules import Embedding
 from allennlp.nn import util
 
-from quant_exp_bias.modules.decoders.decoder_net import DecoderNet
-from quant_exp_bias.oracles.oracle_base import Oracle
-from quant_exp_bias.modules.decoders.auto_regressive_decoder import QuantExpAutoRegressiveSeqDecoder
-from quant_exp_bias.modules.decoders.seq_decoder import SeqDecoder
-from quant_exp_bias.modules.cost_functions.cost_function import CostFunction
-from quant_exp_bias.modules.cost_functions.noise_oracle_likelihood_cost_function import NoiseOracleCostFunction
-from quant_exp_bias.modules.detokenizers.detokenizer import DeTokenizer, default_tokenizer
+from lmpl.modules.decoders.decoder_net import DecoderNet
+from lmpl.oracles.oracle_base import Oracle
+from lmpl.modules.decoders.auto_regressive_decoder import QuantExpAutoRegressiveSeqDecoder
+from lmpl.modules.decoders.seq_decoder import SeqDecoder
+from lmpl.modules.cost_functions.cost_function import CostFunction
+from lmpl.modules.cost_functions.noise_oracle_likelihood_cost_function import NoiseOracleCostFunction
+from lmpl.modules.detokenizers.detokenizer import DeTokenizer, default_tokenizer
 
-@SeqDecoder.register("quant_exp_searnn_decoder")
+@SeqDecoder.register("lmpl_searnn_decoder")
 class QuantExpSEARNNDecoder(QuantExpAutoRegressiveSeqDecoder):
 
     def __init__(self,

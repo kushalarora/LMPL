@@ -17,7 +17,7 @@ from allennlp.data.token_indexers import TokenIndexer, SingleIdTokenIndexer
 logger = logging.getLogger(__name__)
 
 
-@DatasetReader.register("quant_exp_seq2seq")
+@DatasetReader.register("lmpl_seq2seq")
 class Seq2SeqDatasetReader(DatasetReader):
     """
     Read a tsv file containing paired sequences, and create a dataset suitable for a

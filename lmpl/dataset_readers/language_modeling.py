@@ -17,7 +17,7 @@ from transformers.tokenization_gpt2 import GPT2TokenizerFast
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 
-@DatasetReader.register("quant_exp_language_modeling")
+@DatasetReader.register("lmpl_language_modeling")
 class LanguageModelingDatasetReader(DatasetReader):
     """
     Reads sentences, one per line, for language modeling. This does not handle arbitrarily formatted

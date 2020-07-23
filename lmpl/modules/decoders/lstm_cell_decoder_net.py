@@ -8,10 +8,10 @@ from allennlp.common.checks import ConfigurationError
 from allennlp.modules import Attention
 from allennlp.nn import util
 
-from quant_exp_bias.modules.decoders.decoder_net import DecoderNet
+from lmpl.modules.decoders.decoder_net import DecoderNet
 
 
-@DecoderNet.register("quant_exp_bias_lstm_cell")
+@DecoderNet.register("lmpl_lstm_cell")
 class LstmCellDecoderNet(DecoderNet):
     """
     This decoder net implements simple decoding network with LSTMCell and Attention.
@@ -83,7 +83,7 @@ class LstmCellDecoderNet(DecoderNet):
         # Ensure mask is also a FloatTensor. Or else the multiplication within
         # attention will complain.
         # shape: (batch_size, max_input_sequence_length, encoder_output_dim)
-        encoder_outputs_mask = encoder_outputs_mask.float()
+        # encoder_outputs_mask = encoder_outputs_mask.float()
 
         # shape: (batch_size, max_input_sequence_length)
         input_weights = self._attention(decoder_hidden_state, 

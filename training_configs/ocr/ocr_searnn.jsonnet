@@ -1,6 +1,6 @@
 {
   "dataset_reader": {
-    "type": "quant_exp_seq2seq",
+    "type": "lmpl_seq2seq",
     "source_token_indexers": {
       "tokens": {
         "type": "ocr_indexer",
@@ -24,16 +24,16 @@
   "test_data_path": "data/ocr/test.txt",
   "evaluate_on_test": true,
   "model": {
-    "type": "quant_exp_composed_lm",
+    "type": "lmpl_composed_lm",
     "use_in_seq2seq_mode": true,
     "decoder": {
-        "type": "quant_exp_searnn_decoder",
+        "type": "lmpl_searnn_decoder",
         "max_decoding_steps": 14,
         "generation_batch_size": 1024, 
         "rollin_mode":  std.extVar("rollin_mode"),
         "rollout_mode": std.extVar("rollout_mode"),
         "decoder_net": {
-            "type": "quant_exp_bias_lstm_cell",
+            "type": "lmpl_lstm_cell",
             "decoding_dim": 256, 
             "target_embedding_dim": 128,
         },
