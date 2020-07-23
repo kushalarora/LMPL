@@ -1,6 +1,6 @@
 from typing import List
 
-from quant_exp_bias.oracles.oracle_base import Oracle
+from lmpl.oracles.oracle_base import Oracle
 from nltk import PCFG
 from nltk.grammar import Nonterminal
 from nltk.parse.pchart import InsideChartParser

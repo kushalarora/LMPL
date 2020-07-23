@@ -1,6 +1,6 @@
 {
   "dataset_reader": {
-    "type": "quant_exp_seq2seq",
+    "type": "lmpl_seq2seq",
     "source_token_indexers": {
       "tokens": {
         "type": "single_id",
@@ -22,21 +22,40 @@
   "train_data_path": "data/iwslt/train.de-en.tsv",
   "validation_data_path": "data/iwslt/dev.de-en.tsv",
   "model": {
-    "type": "quant_exp_seq2seq",
-    "target_namespace": "target_tokens",
-    "target_output_dim": 256, 
-    "target_embedding_dim": 256,
-    "generation_batch_size": 32, 
-    "max_decoding_steps": 50,
-    "beam_size": 1,
-    "use_bleu": true,
+    "type": "lmpl_composed_lm",
+    "use_in_seq2seq_mode": true,
+    "decoder": {
+        "type": "lmpl_auto_regressive_seq_decoder",
+        "max_decoding_steps": 50,
+        "decoder_net": {
+            "type": "lmpl_lstm_cell",
+            "decoding_dim": 512, 
+            "target_embedding_dim": 256,
+            "attention": {
+                "type": "additive",
+                "vector_dim": 512,
+                "matrix_dim": 512
+            },
+        },
+        "target_embedder": {
+          "vocab_namespace": "target_tokens",
+          "embedding_dim": 256, 
+        },
+        "use_in_seq2seq_mode": true, 
+        "target_namespace": "target_tokens",
+        "beam_size": 1,
+        "use_bleu" : true,
+        "dropout": 0.2,
+    },
     "source_embedder": {
-      "tokens": {
-        "type": "embedding",
-        "vocab_namespace": "source_tokens",
-        "embedding_dim": 256,
-        "trainable": true
-      }
+      "token_embedders": {
+        "tokens": {
+          "type": "embedding",
+          "vocab_namespace": "source_tokens",
+          "embedding_dim": 256,
+          "trainable": true
+        }
+      },
     },
     "encoder": {
       "type": "lstm",
@@ -46,12 +65,8 @@
       "dropout": 0,
       "bidirectional": true
     },
-    "attention": {
-      "type": "additive",
-      "vector_dim": 512,
-      "matrix_dim": 512
-    },
-    "initializer": [
+    "initializer": {
+      "regexes": [
         ["embedder*.*weight", {"type": "kaiming_uniform"}],
         [".*projection_layer.*weight", {"type": "xavier_uniform"}],
         [".*projection_layer.*bias", {"type": "zero"}],
@@ -59,18 +74,20 @@
         [".*weight_hh.*", {"type": "orthogonal"}],
         [".*bias_ih.*", {"type": "zero"}],
         [".*bias_hh.*", {"type": "lstm_hidden_bias"}]
-    ]
+      ],
+    }
   },
-  "iterator": {
-    "type": "bucket",
-    "padding_noise": 0.0,
-    "batch_size" : 96,
-    "sorting_keys": [["source_tokens", "num_tokens"]],
-    "max_instances_in_memory": 10000
+  "data_loader": {
+    "batch_sampler": {
+      "type": "bucket",
+      "padding_noise": 0.0,
+      "batch_size": 48,
+    }
   },
   "trainer": {
     "num_epochs": 80,
     "patience": 10,
+    "opt_level": "O2",
     "cuda_device": 0,
     "optimizer": {
       "type": "adam",
@@ -80,7 +97,8 @@
       "type": "exponential",
       "gamma": 0.99
     },
-    "should_log_learning_rate": true,
-    "should_log_parameter_statistics": false
+    "checkpointer": {
+      "num_serialized_models_to_keep": 1,
+    },
   }
 }

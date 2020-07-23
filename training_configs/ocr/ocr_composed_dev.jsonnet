@@ -1,6 +1,6 @@
 {
   "dataset_reader": {
-    "type": "quant_exp_seq2seq",
+    "type": "lmpl_seq2seq",
     "source_token_indexers": {
       "tokens": {
         "type": "ocr_indexer",
@@ -22,14 +22,14 @@
   "train_data_path": "data/ocr/valid.txt",
   "validation_data_path": "data/ocr/valid.txt",
   "model": {
-    "type": "quant_exp_composed_lm",
+    "type": "lmpl_composed_lm",
     "use_in_seq2seq_mode": true,
     "decoder": {
-        "type": "quant_exp_auto_regressive_seq_decoder",
+        "type": "lmpl_auto_regressive_seq_decoder",
         "max_decoding_steps": 14,
         "generation_batch_size": 1024, 
         "decoder_net": {
-            "type": "quant_exp_bias_lstm_cell",
+            "type": "lmpl_lstm_cell",
             "decoding_dim": 256, 
             "target_embedding_dim": 128,
 #            "attention": {

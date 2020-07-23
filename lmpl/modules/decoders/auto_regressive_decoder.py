@@ -18,13 +18,13 @@ from allennlp.modules import Embedding
 from allennlp.nn import util
 from allennlp.training.metrics import BLEU, Perplexity, Average
 
-from quant_exp_bias.models.sampled_beam_search import SampledBeamSearch
-from quant_exp_bias.modules.decoders.seq_decoder import SeqDecoder
-from quant_exp_bias.modules.decoders.decoder_net import DecoderNet
-from quant_exp_bias.modules.cost_functions.cost_function import CostFunction
-from quant_exp_bias.modules.detokenizers.detokenizer import DeTokenizer, default_tokenizer
+from lmpl.models.sampled_beam_search import SampledBeamSearch
+from lmpl.modules.decoders.seq_decoder import SeqDecoder
+from lmpl.modules.decoders.decoder_net import DecoderNet
+from lmpl.modules.cost_functions.cost_function import CostFunction
+from lmpl.modules.detokenizers.detokenizer import DeTokenizer, default_tokenizer
 
-from quant_exp_bias.metrics.hamming_loss import HammingLoss
+from lmpl.metrics.hamming_loss import HammingLoss
 
 
 
@@ -73,7 +73,7 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-1e30):
         logits.scatter_(-1, sorted_indices, sorted_logits)
     return logits
 
-@SeqDecoder.register("quant_exp_auto_regressive_seq_decoder")
+@SeqDecoder.register("lmpl_auto_regressive_seq_decoder")
 class QuantExpAutoRegressiveSeqDecoder(SeqDecoder):
     """
     An autoregressive decoder.

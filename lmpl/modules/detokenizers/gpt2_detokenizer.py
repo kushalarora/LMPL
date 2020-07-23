@@ -1,7 +1,7 @@
 from typing import List
 
-from quant_exp_bias.modules.detokenizers.detokenizer import DeTokenizer
-from pytorch_transformers import GPT2Tokenizer
+from lmpl.modules.detokenizers.detokenizer import DeTokenizer
+from transformers import GPT2Tokenizer, GPT2LMHeadModel
 
 import overrides
 

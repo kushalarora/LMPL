@@ -9,7 +9,7 @@ from multiprocessing import Pool
 
 import torch
 
-from quant_exp_bias.modules.cost_functions import CostFunction
+from lmpl.modules.cost_functions import CostFunction
 
 def init_pool():
     global scorer

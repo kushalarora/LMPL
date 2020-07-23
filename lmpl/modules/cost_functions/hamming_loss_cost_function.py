@@ -2,7 +2,7 @@ from typing import Dict, Optional, Tuple, Union, List
 
 from overrides import overrides
 
-from quant_exp_bias.modules.cost_functions import CostFunction
+from lmpl.modules.cost_functions import CostFunction
 
 import torch
 

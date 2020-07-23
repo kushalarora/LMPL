@@ -2,8 +2,8 @@ from typing import Dict, Optional, Tuple, Union, List
 
 from overrides import overrides
 
-from quant_exp_bias.modules.cost_functions.cost_function import CostFunction
-from quant_exp_bias.oracles.oracle_base import Oracle
+from lmpl.modules.cost_functions.cost_function import CostFunction
+from lmpl.oracles.oracle_base import Oracle
 
 import logging
 import numpy as np

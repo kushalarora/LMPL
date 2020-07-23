@@ -1,2 +1,2 @@
-from quant_exp_bias.oracles.artificial_grammar_oracle import ArtificialLanguageOracle
-from quant_exp_bias.oracles.oracle_base import Oracle
+from lmpl.oracles.artificial_grammar_oracle import ArtificialLanguageOracle
+from lmpl.oracles.oracle_base import Oracle
