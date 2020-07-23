@@ -19,7 +19,7 @@
         "target": 22822
     }
   },
-  "train_data_path": "data/ocr/valid.txt",
+  "train_data_path": "data/ocr/train.txt",
   "validation_data_path": "data/ocr/valid.txt",
   "model": {
     "type": "lmpl_composed_lm",
@@ -49,11 +49,13 @@
         "dropout": 0.2,
     },
     "source_embedder": {
-      "tokens": {
-        "type": "ocr_token_embedder",
-        "hidden_dim": 128,
-        "binary_str_size": 128,
-      }
+      "token_embedders": {
+        "tokens": {
+          "type": "ocr_token_embedder",
+          "hidden_dim": 128,
+          "binary_str_size": 128,
+        }
+      },
     },
     "encoder": {
       "type": "lstm",
@@ -63,21 +65,24 @@
       "dropout": 0,
       "bidirectional": true
     },
-    "initializer": [
-        ["embedder*.*weight", {"type": "kaiming_uniform"}],
-        [".*projection_layer.*weight", {"type": "xavier_uniform"}],
-        [".*projection_layer.*bias", {"type": "zero"}],
-        [".*weight_ih.*", {"type": "xavier_uniform"}],
-        [".*weight_hh.*", {"type": "orthogonal"}],
-        [".*bias_ih.*", {"type": "zero"}],
-        [".*bias_hh.*", {"type": "lstm_hidden_bias"}]
-    ]
+    "initializer": {
+      "regexes": [
+          ["embedder*.*weight", {"type": "kaiming_uniform"}],
+          [".*projection_layer.*weight", {"type": "xavier_uniform"}],
+          [".*projection_layer.*bias", {"type": "zero"}],
+          [".*weight_ih.*", {"type": "xavier_uniform"}],
+          [".*weight_hh.*", {"type": "orthogonal"}],
+          [".*bias_ih.*", {"type": "zero"}],
+          [".*bias_hh.*", {"type": "lstm_hidden_bias"}]
+      ]
+    }
   },
-  "iterator": {
-    "type": "bucket",
-    "padding_noise": 0.0,
-    "batch_size" : 48,
-    "sorting_keys": [["source_tokens", "num_tokens"]],
+  "data_loader": {
+    "batch_sampler": {
+      "type": "bucket",
+      "padding_noise": 0.0,
+      "batch_size" : 48,
+    }
   },
   "trainer": {
     "num_epochs": 80,
@@ -94,7 +99,8 @@
       "mode": "min",
       "patience": 2
     },
-    "should_log_learning_rate": true,
-    "should_log_parameter_statistics": false
+    "checkpointer": {
+      "num_serialized_models_to_keep": 1,
+    },
   }
 }
