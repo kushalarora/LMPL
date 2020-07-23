@@ -10,7 +10,7 @@ from allennlp.modules import TextFieldEmbedder, Seq2SeqEncoder, Embedding
 from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
 from allennlp.nn import util, InitializerApplicator, RegularizerApplicator
 
-from lmpl.modules.decoders.seq_decoder import SeqDecoder
+from allennlp_models.generation.modules.seq_decoders import SeqDecoder
 
 
 @Model.register("lmpl_composed_lm")
@@ -104,9 +104,6 @@ class ComposedLMBase(Model):
         self,  # type: ignore
         source_tokens: Dict[str, torch.LongTensor] = None,
         target_tokens: Dict[str, torch.LongTensor] = None,
-        sample_rollouts: bool = False,
-        generation_batch_size:int = 1024,
-        max_decoding_step: int = None
     ) -> Dict[str, torch.Tensor]:
 
         """
@@ -129,11 +126,7 @@ class ComposedLMBase(Model):
         state:  Dict[str, torch.Tensor] = {}
         if self._seq2seq_mode:
             state.update(self._encode(source_tokens))
-        return self._decoder(state, 
-                             target_tokens,
-                             sample_rollouts=sample_rollouts,
-                             generation_batch_size=generation_batch_size,
-                             max_decoding_step=max_decoding_step)
+        return self._decoder(state, target_tokens)
 
     @overrides
     def make_output_human_readable(self, output_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:

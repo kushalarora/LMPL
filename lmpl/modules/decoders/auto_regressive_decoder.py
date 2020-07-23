@@ -15,12 +15,14 @@ from allennlp.common.checks import ConfigurationError
 from allennlp.common.util import START_SYMBOL, END_SYMBOL
 from allennlp.data.vocabulary import Vocabulary, DEFAULT_OOV_TOKEN, DEFAULT_PADDING_TOKEN
 from allennlp.modules import Embedding
+
 from allennlp.nn import util
 from allennlp.training.metrics import BLEU, Perplexity, Average
 
+from allennlp_models.generation.modules.seq_decoders import SeqDecoder
+from allennlp_models.generation.modules.decoder_nets import DecoderNet
+
 from lmpl.models.sampled_beam_search import SampledBeamSearch
-from lmpl.modules.decoders.seq_decoder import SeqDecoder
-from lmpl.modules.decoders.decoder_net import DecoderNet
 from lmpl.modules.cost_functions.cost_function import CostFunction
 from lmpl.modules.detokenizers.detokenizer import DeTokenizer, default_tokenizer
 
@@ -127,7 +129,7 @@ class QuantExpAutoRegressiveSeqDecoder(SeqDecoder):
                  use_bleu: bool = False,
                  use_hamming: bool = False,
                  dropout: float = None,
-                 sample_output: bool = False,
+                 sample_rollouts: bool = False,
                  start_token: str =START_SYMBOL,
                  end_token: str = END_SYMBOL,
                  num_decoder_layers: int = 1,
@@ -164,7 +166,7 @@ class QuantExpAutoRegressiveSeqDecoder(SeqDecoder):
         self._scheduled_sampling_ratio = scheduled_sampling_ratio
         self._scheduled_sampling_k = scheduled_sampling_k
         self._scheduled_sampling_type = scheduled_sampling_type
-        self._sample_output = sample_output
+        self._sample_rollouts = sample_rollouts
         self._mask_pad_and_oov = mask_pad_and_oov
 
         self._rollout_mixing_prob = rollout_mixing_prob
@@ -487,10 +489,7 @@ class QuantExpAutoRegressiveSeqDecoder(SeqDecoder):
     @overrides
     def forward(self,  # type: ignore
                 encoder_out: Dict[str, torch.LongTensor] = {},
-                target_tokens: Dict[str, torch.LongTensor] = None,
-                sample_rollouts: bool = False,
-                generation_batch_size:int = 1024,
-                max_decoding_step: int = None,) -> Dict[str, torch.Tensor]:
+                target_tokens: Dict[str, torch.LongTensor] = None) -> Dict[str, torch.Tensor]:
         # pylint: disable=arguments-differ
         """
         Make foward pass with decoder logic for producing the entire target sequence.
@@ -526,7 +525,7 @@ class QuantExpAutoRegressiveSeqDecoder(SeqDecoder):
         # shape: (batch_size,)
         start_predictions = self._get_start_predictions(state,
                                                         target_tokens,
-                                                        generation_batch_size)
+                                                        self._generation_batch_size)
         
         # In case we have target_tokens, roll-in and roll-out
         # only till those many steps, otherwise we roll-out for
@@ -572,7 +571,7 @@ class QuantExpAutoRegressiveSeqDecoder(SeqDecoder):
                                                 start_predictions,
                                                 rollout_steps=num_decoding_steps,
                                                 rollout_mode='learned',
-                                                sampled=sample_rollouts,
+                                                sampled=self._sample_rollouts,
                                                 # TODO (Kushal): Add a reason why truncate_at_end_all is False here.
                                                 truncate_at_end_all=False)
 
@@ -1028,19 +1027,43 @@ class QuantExpAutoRegressiveSeqDecoder(SeqDecoder):
 
         Inputs are the same as for `take_step()`.
         """
-        # shape: (batch_size, 1, target_embedding_dim)
-        last_predictions_embeddings = self.target_embedder(last_predictions)
+        # shape: (group_size, max_input_sequence_length, encoder_output_dim)
+        encoder_outputs = state.get("encoder_outputs", None)
 
-        last_predictions_embeddings_w_dropout = self._dropout(last_predictions_embeddings)
+        # shape: (group_size, max_input_sequence_length)
+        source_mask = state.get("source_mask", None)
+
+        # shape: (group_size, steps_count, decoder_output_dim)
+        previous_steps_predictions = state.get("previous_steps_predictions", None)
+
+        # shape: (batch_size, 1, target_embedding_dim)
+        last_predictions_embeddings = self.target_embedder(last_predictions).unsqueeze(1)
+
+        if previous_steps_predictions is None or previous_steps_predictions.shape[-1] == 0:
+            # There is no previous steps, except for start vectors in `last_predictions`
+            # shape: (group_size, 1, target_embedding_dim)
+            previous_steps_predictions = last_predictions_embeddings
+        else:
+            # shape: (group_size, steps_count, target_embedding_dim)
+            previous_steps_predictions = torch.cat(
+                [previous_steps_predictions, last_predictions_embeddings], 1
+            )
 
         decoder_state, decoder_output = self._decoder_net(
             previous_state=state,
-            last_predictions_embedding=last_predictions_embeddings_w_dropout
+            encoder_outputs=encoder_outputs,
+            source_mask=source_mask,
+            previous_steps_predictions=previous_steps_predictions,
         )
+        
+        state["previous_steps_predictions"] = previous_steps_predictions
 
         # Update state with new decoder state, override previous state
         state.update(decoder_state)
-
+        
+        if self._decoder_net.decodes_parallel:
+            decoder_output = decoder_output[:, -1, :]
+        
         # add dropout
         decoder_hidden_with_dropout = self._dropout(decoder_output)
 
@@ -1087,7 +1110,7 @@ class QuantExpAutoRegressiveSeqDecoder(SeqDecoder):
         return util.sequence_cross_entropy_with_logits(logits, relevant_targets, relevant_mask, label_smoothing=self._label_smoothing_ratio, average=None)
 
     @overrides
-    def get_metrics(self, reset: bool = False,) -> Dict[str, float]:
+    def get_metrics(self, reset: bool = False) -> Dict[str, float]:
         all_metrics: Dict[str, float] = {}
 
         all_metrics.update({'perplexity': self._perplexity.get_metric(reset=reset),

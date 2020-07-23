@@ -36,7 +36,6 @@
         "beam_size": 1,
         "use_bleu" : false,
         "dropout": 0.2,
-        "sample_output": true,
         "start_token": "<S>",
         "end_token": "</S>",
       },
@@ -65,7 +64,7 @@
     "validation_metric": "-perplexity",
     "optimizer": {
       "type": "sgd",
-      "lr": 20,
+      "lr": 2,
     },
     "learning_rate_scheduler": {
         "type": "reduce_on_plateau",

@@ -8,7 +8,7 @@ from allennlp.common.checks import ConfigurationError
 from allennlp.modules import Attention
 from allennlp.nn import util
 
-from lmpl.modules.decoders.decoder_net import DecoderNet
+from allennlp_models.generation.modules.decoder_nets import DecoderNet
 
 
 @DecoderNet.register("lmpl_lstm_cell")
@@ -121,7 +121,10 @@ class LstmCellDecoderNet(DecoderNet):
     @overrides
     def forward(self,
                 previous_state: Dict[str, torch.Tensor],
-                last_predictions_embedding: torch.Tensor,
+                previous_steps_predictions: torch.Tensor,
+                previous_steps_mask: Optional[torch.BoolTensor] = None,
+                encoder_outputs: torch.Tensor = None,
+                source_mask: torch.BoolTensor = None,
                ) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
 
         # shape (decoder_hidden): (batch_size, 1, decoder_output_dim)
@@ -148,15 +151,12 @@ class LstmCellDecoderNet(DecoderNet):
 
 
         # shape: (group_size, output_dim)
+        last_predictions_embedding = previous_steps_predictions[:, -1]
 
         # shape: (group_size, max_input_sequence_length, encoder_output_dim)
         encoder_outputs = previous_state.get("encoder_outputs", None)
 
         if encoder_outputs is not None and self._attention:
-
-            # shape: (group_size, max_input_sequence_length)
-            source_mask = previous_state["source_mask"]
-
             # shape: (group_size, encoder_output_dim)
             attended_input = self._prepare_attended_input(decoder_hidden, encoder_outputs, source_mask)
 
