@@ -1,4 +1,4 @@
-# Language Modeling as a Policy Learning (LMPL) library.
+# Language Modeling as Policy Learning (LMPL) library.
 # Installation:
 ```
 python setup.py --editable
