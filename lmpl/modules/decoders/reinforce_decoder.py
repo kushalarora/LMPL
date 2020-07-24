@@ -17,7 +17,7 @@ from allennlp_models.generation.modules.decoder_nets import DecoderNet
 from allennlp_models.generation.modules.seq_decoders import SeqDecoder
 
 from lmpl.oracles.oracle_base import Oracle
-from lmpl.modules.decoders.searnn_decoder import QuantExpSEARNNDecoder
+from lmpl.modules.decoders.searnn_decoder import LMPLSEARNNDecoder
 from lmpl.modules.cost_functions.cost_function import CostFunction
 from lmpl.modules.cost_functions.noise_oracle_likelihood_cost_function import NoiseOracleCostFunction
 from lmpl.modules.detokenizers.detokenizer import DeTokenizer, default_tokenizer
@@ -26,7 +26,7 @@ torch.autograd.set_detect_anomaly(True)
 
 
 @SeqDecoder.register("lmpl_reinforce_decoder")
-class QuantExpReinforceDecoder(QuantExpSEARNNDecoder):
+class LMPLReinforceDecoder(LMPLSEARNNDecoder):
 
     def __init__(self,
                  vocab: Vocabulary,

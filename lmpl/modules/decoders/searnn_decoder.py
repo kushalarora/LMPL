@@ -15,13 +15,13 @@ from allennlp_models.generation.modules.decoder_nets import DecoderNet
 from allennlp_models.generation.modules.seq_decoders import SeqDecoder
 
 from lmpl.oracles.oracle_base import Oracle
-from lmpl.modules.decoders.auto_regressive_decoder import QuantExpAutoRegressiveSeqDecoder
+from lmpl.modules.decoders.auto_regressive_decoder import LMPLAutoRegressiveSeqDecoder
 from lmpl.modules.cost_functions.cost_function import CostFunction
 from lmpl.modules.cost_functions.noise_oracle_likelihood_cost_function import NoiseOracleCostFunction
 from lmpl.modules.detokenizers.detokenizer import DeTokenizer, default_tokenizer
 
 @SeqDecoder.register("lmpl_searnn_decoder")
-class QuantExpSEARNNDecoder(QuantExpAutoRegressiveSeqDecoder):
+class LMPLSEARNNDecoder(LMPLAutoRegressiveSeqDecoder):
 
     def __init__(self,
                  vocab: Vocabulary,

@@ -71,12 +71,13 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-1e30):
         sorted_indices_to_remove[..., 0] = 0
 
         indices_to_remove = sorted_indices[sorted_indices_to_remove]
-        sorted_logits += sorted_indices_to_remove.int() * filter_value
+        filter_tensor = torch.ones_like(sorted_logits) * filter_value
+        sorted_logits = torch.where(sorted_indices_to_remove, filter_tensor, sorted_logits)
         logits.scatter_(-1, sorted_indices, sorted_logits)
     return logits
 
 @SeqDecoder.register("lmpl_auto_regressive_seq_decoder")
-class QuantExpAutoRegressiveSeqDecoder(SeqDecoder):
+class LMPLAutoRegressiveSeqDecoder(SeqDecoder):
     """
     An autoregressive decoder.
     Parameters
