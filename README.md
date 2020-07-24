@@ -22,7 +22,7 @@ pip install https://github.com/explosion/spacy-models/releases/download/en_core_
 
 ## Running PTB experiments:
 ```
-  allennlp train training_configs/natural_lang/ptb.jsonnet -s result/lm/ptb --include-package lmpl
+  allennlp train training_configs/natural_lang/ptb_lm.jsonnet -s result/lm/ptb --include-package lmpl
 ```
 
 ## Running IWSLT14 de-en experiments:
