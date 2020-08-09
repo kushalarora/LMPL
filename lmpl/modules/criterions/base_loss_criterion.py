@@ -134,6 +134,10 @@ class LossCriterion(Registrable):
                                 predictions=top_predicted_tokens,
                                 gold_labels=targets,
                                 mask=target_masks)
+    
+    if 'logits' in rollout_output_dict:
+      cost_batch = cost_batch.to(rollout_output_dict['logits'].dtype)
+
     return cost_batch
 
   def takes_decoded_input(self) -> bool:
