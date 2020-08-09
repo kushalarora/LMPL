@@ -1,0 +1,11 @@
+from lmpl.modules.criterions.base_loss_criterion import LossCriterion
+from lmpl.modules.criterions.expected_risk_minimization_criterion import ExpectedRiskMinimization
+from lmpl.modules.criterions.kl_criterion import KLLossCriterion
+from lmpl.modules.criterions.max_margin_criterion import MaxMarginLossCriterion
+from lmpl.modules.criterions.maximum_likelihood_criterion import MaximumLikelihoodLossCriterion
+from lmpl.modules.criterions.multi_margin_criterion import MultiMarginLossCriterion
+from lmpl.modules.criterions.reinforce_criterion import ReinforceCriterion
+from lmpl.modules.criterions.softmax_margin_criterion import SoftmaxMarginLossCriterion
+
+
+

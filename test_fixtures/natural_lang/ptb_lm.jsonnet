@@ -10,19 +10,19 @@
       "start_tokens": ["<S>"],
       "end_tokens": ["</S>"]
     },
-    "train_data_path": "data/ptb/ptb.train.txt",
-    "validation_data_path": "data/ptb/ptb.valid.txt",
+    "train_data_path": "test_fixtures/natural_lang/sentences.txt",
+    "validation_data_path": "test_fixtures/natural_lang/sentences.txt",
     "model": {
       "type": "lmpl_composed_lm",
       "use_in_seq2seq_mode": false,
       "decoder": {
         "type": "lmpl_auto_regressive_seq_decoder",
-        "max_decoding_steps": 400,
+        "max_decoding_steps": 20,
         "generation_batch_size": 32, 
         "decoder_net": {
           "type": "lmpl_lstm_cell",
-          "decoding_dim": 1200, 
-          "target_embedding_dim": 400,
+          "decoding_dim": 12, 
+          "target_embedding_dim": 12,
           # This doesn't seem to be working as of
           # now.
           // "num_decoder_layers": 4,
@@ -32,7 +32,7 @@
         },
         "target_embedder": {
           "vocab_namespace": "target_tokens",
-          "embedding_dim": 400
+          "embedding_dim": 12
         },
         "use_in_seq2seq_mode": false,
         "target_namespace": "target_tokens",
@@ -57,15 +57,14 @@
   "data_loader": {
     "batch_sampler": {
       "type": "bucket",
+      "sorting_keys": ["target_tokens"],
       "padding_noise": 0.0,
       "batch_size": 128,
-      
-      "shuffle": false,
     }
   },
   "trainer": {
-    "num_epochs": 100,
-    "cuda_device" : 0,
+    "num_epochs": 2,
+    "cuda_device" : -1,
     "validation_metric": "-perplexity",
     "optimizer": {
       "type": "sgd",
