@@ -37,7 +37,7 @@ class BLEUCostFunction(CostFunction):
                  eos_token: int = 4,
                  unk_token: int = 1,
                  use_decoded_inputs:bool = True,
-                 use_parallel: bool = True,
+                 use_parallel: bool = False,
                  num_threads:int = 64,
                  ):
 
