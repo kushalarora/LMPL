@@ -212,7 +212,6 @@ class NaturalLanguageOracle(Oracle):
 
         state['rollout_params']['rollout_prefixes'] = oracle_prefixes
 
-        import pdb;pdb.set_trace()
         start_time = time.time()
         logits, past =  self.model(oracle_prefixes[:, 1:], past=past)
         end_time = time.time()
