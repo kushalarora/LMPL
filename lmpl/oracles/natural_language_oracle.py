@@ -73,7 +73,7 @@ class NaturalLanguageOracle(Oracle):
             max_len = max(3, max([len(sequence) for sequence in batch]))
             ids = [self.tokenizer.convert_tokens_to_ids(sequence) + [self.tokenizer.eos_token_id] * (max_len - len(sequence)) for sequence in batch]
             tensor_input = torch.tensor(ids).to(self.device)
-            attention_mask = (tensor_input != self.tokenizer.eos_token_id).float().to(self.device)
+            attention_mask = (tensor_input != self.tokenizer.eos_token_id).to(self.device)
 
             with torch.no_grad():
                 results =  self.model(tensor_input, labels=tensor_input, attention_mask=attention_mask)
@@ -138,7 +138,7 @@ class NaturalLanguageOracle(Oracle):
             # we assume we can meaningfully end the sentence and we do.
             next_tokens = torch.where((int(step > 0.5 * rollout_steps) * 
                                         ((predictions == self.tokenizer.eos_token_id).sum(-1) > 0) \
-                                            .float()) \
+                                            ) \
                                       .bool(), 
                                 torch.zeros_like(predictions[:, 0]).fill_(self.tokenizer.eos_token_id), 
                                 predictions[:, 0]) \
@@ -229,7 +229,7 @@ class NaturalLanguageOracle(Oracle):
         # we assume we can meaningfully end the sentence and we do.
         next_oracle_idxs = torch.where((((predictions == self.tokenizer.eos_token_id).sum(-1) + 
                                         (predictions == 198).sum(-1) > 0) \
-                                            .float()) \
+                                            ) \
                                         .bool(), 
                                 torch.zeros_like(predictions[:, 0]).fill_(self._end_token_id), 
                                 predictions[:, 0])

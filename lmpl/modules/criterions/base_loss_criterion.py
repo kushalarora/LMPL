@@ -80,7 +80,7 @@ class LossCriterion(Registrable):
     if target_tokens:
       target_mask = util.get_text_field_mask(target_tokens)
       # shape : (batch_size,)
-      target_mask = target_mask[:, 1:].float()
+      target_mask = target_mask[:, 1:]
       non_batch_dims = tuple(range(1, len(target_mask.shape)))
 
       target_mask_sum = target_mask.sum(dim=non_batch_dims)

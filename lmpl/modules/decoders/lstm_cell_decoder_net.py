@@ -83,7 +83,7 @@ class LstmCellDecoderNet(DecoderNet):
         # Ensure mask is also a FloatTensor. Or else the multiplication within
         # attention will complain.
         # shape: (batch_size, max_input_sequence_length, encoder_output_dim)
-        # encoder_outputs_mask = encoder_outputs_mask.float()
+        # encoder_outputs_mask = encoder_outputs_mask
 
         # shape: (batch_size, max_input_sequence_length)
         input_weights = self._attention(decoder_hidden_state, 

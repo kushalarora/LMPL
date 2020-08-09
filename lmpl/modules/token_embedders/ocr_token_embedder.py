@@ -31,7 +31,7 @@ class OCRBinaryStringTokenEmbedder(TokenEmbedder):
         return self.hidden_dim
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:    
-        return self._embedding(inputs.float())
+        return self._embedding(inputs)
 
 
     @classmethod
