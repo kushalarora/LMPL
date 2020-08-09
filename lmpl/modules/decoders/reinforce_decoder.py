@@ -51,6 +51,7 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
                  use_bleu: bool = False,
                  use_hamming: bool = False,
 
+
                  beam_search_sampling_temperature: float = 1.,
                  top_k=0, 
                  top_p=0,
@@ -90,6 +91,7 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
             use_bleu=use_bleu,
             use_hamming=use_hamming,
 
+
             beam_search_sampling_temperature=beam_search_sampling_temperature,
             top_k=top_k,
             top_p=top_p,
@@ -108,3 +110,4 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
             detach_rollin_logits=detach_rollin_logits,
             rollin_rollout_mixing_coeff=rollin_rollout_mixing_coeff,
     )
+
