@@ -141,7 +141,6 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
 
                  dropout: float = None,
                  sample_rollouts: bool = False,                 
-
                  start_token: str =START_SYMBOL,
                  end_token: str = END_SYMBOL,
                  num_decoder_layers: int = 1,
@@ -151,7 +150,6 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                  use_bleu: bool = False,
                  use_hamming: bool = False,
 
-                 sample_rollouts: bool = False,
                  beam_search_sampling_temperature: float = 1.,
                  top_k=0, 
                  top_p=0,
@@ -198,7 +196,6 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             use_bleu=use_bleu,
             use_hamming=use_hamming,
 
-            sample_rollouts=sample_rollouts,
             beam_search_sampling_temperature=beam_search_sampling_temperature,
             top_k=top_k,
             top_p=top_p,
