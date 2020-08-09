@@ -41,6 +41,7 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
                  scheduled_sampling_type: str = 'uniform',
 
                  dropout: float = None,
+                 sample_rollouts: bool = False,
                  start_token: str =START_SYMBOL,
                  end_token: str = END_SYMBOL,
                  num_decoder_layers: int = 1,
@@ -80,6 +81,7 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
             scheduled_sampling_type=scheduled_sampling_type,
 
             dropout=dropout,
+            sample_rollouts=sample_rollouts,
             start_token=start_token,
             end_token=end_token,
             num_decoder_layers=num_decoder_layers,
