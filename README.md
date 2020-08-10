@@ -27,5 +27,5 @@ pip install https://github.com/explosion/spacy-models/releases/download/en_core_
 
 ## Running IWSLT14 de-en experiments:
 ```
-  allennlp train training_configs/iwslt/iwslt_de_en.jsonnet -s result/iwslt/ --include-package lmpl
+  allennlp train training_configs/iwslt/iwslt14_de_en.jsonnet -s result/iwslt/ --include-package lmpl
 ```
