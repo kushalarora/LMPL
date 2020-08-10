@@ -59,12 +59,11 @@
       "type": "bucket",
       "padding_noise": 0.0,
       "batch_size": 128,
-      
-      "shuffle": false,
     }
   },
   "trainer": {
     "num_epochs": 100,
+    "opt_level": 'O2',
     "cuda_device" : 0,
     "validation_metric": "-perplexity",
     "optimizer": {
