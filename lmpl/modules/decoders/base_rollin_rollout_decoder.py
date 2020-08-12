@@ -554,6 +554,11 @@ class BaseRollinRolloutDecoder(SeqDecoder):
             output_dict["detokenized_predictions"] = \
                             self._detokenizer(predicted_tokens)
 
+            # shape (predictions): (batch_size, beam_size, num_decoding_steps)
+            predictions = rollout_output_dict['predictions']
+
+            # shape (best_predictions): (batch_size, num_decoding_steps)
+            best_predictions = predictions[:, 0, :]
             # TODO #3 (Kushal): Maybe abstract out these losses and use loss_metric like AllenNLP uses.
             if self._bleu and target_tokens:
                 targets = util.get_token_ids_from_text_field_tensors(target_tokens)

@@ -13,14 +13,8 @@
       }
     }
   },
-  "vocabulary": {
-    "max_vocab_size": { 
-        "source_tokens": 32009, 
-        "target": 22822
-    }
-  },
-  "train_data_path": "data/iwslt/train.de-en.tsv",
-  "validation_data_path": "data/iwslt/dev.de-en.tsv",
+  "train_data_path": "test_fixtures/natural_lang/seq2seq_copy.tsv",
+  "validation_data_path": "test_fixtures/natural_lang/seq2seq_copy.tsv",
   "model": {
     "type": "lmpl_composed_lm",
     "use_in_seq2seq_mode": true,
@@ -29,17 +23,15 @@
         "max_decoding_steps": 50,
         "decoder_net": {
             "type": "lmpl_lstm_cell",
-            "decoding_dim": 512, 
-            "target_embedding_dim": 256,
+            "decoding_dim": 12, 
+            "target_embedding_dim": 12,
             "attention": {
-                "type": "additive",
-                "vector_dim": 512,
-                "matrix_dim": 512
-            },
+              "type": "dot_product"
+            }
         },
         "target_embedder": {
           "vocab_namespace": "target_tokens",
-          "embedding_dim": 256, 
+          "embedding_dim": 12, 
         },
         "loss_criterion": {
           "type": "mle",
@@ -55,30 +47,19 @@
         "tokens": {
           "type": "embedding",
           "vocab_namespace": "source_tokens",
-          "embedding_dim": 256,
+          "embedding_dim": 12,
           "trainable": true
         }
       },
     },
     "encoder": {
       "type": "lstm",
-      "input_size": 256,
-      "hidden_size": 256,
+      "input_size": 12,
+      "hidden_size": 12,
       "num_layers": 1,
       "dropout": 0,
-      "bidirectional": true
+      "bidirectional": false,
     },
-    "initializer": {
-      "regexes": [
-        ["embedder*.*weight", {"type": "kaiming_uniform"}],
-        [".*projection_layer.*weight", {"type": "xavier_uniform"}],
-        [".*projection_layer.*bias", {"type": "zero"}],
-        [".*weight_ih.*", {"type": "xavier_uniform"}],
-        [".*weight_hh.*", {"type": "orthogonal"}],
-        [".*bias_ih.*", {"type": "zero"}],
-        [".*bias_hh.*", {"type": "lstm_hidden_bias"}]
-      ],
-    }
   },
   "data_loader": {
     "batch_sampler": {
@@ -88,17 +69,11 @@
     }
   },
   "trainer": {
-    "num_epochs": 80,
-    "patience": 10,
-    "opt_level": "O2",
-    "cuda_device": 0,
+    "num_epochs": 1,
+    "cuda_device": -1,
     "optimizer": {
       "type": "adam",
       "lr": 0.0001
-    },
-    "learning_rate_scheduler": {
-      "type": "exponential",
-      "gamma": 0.99
     },
     "checkpointer": {
       "num_serialized_models_to_keep": 1,
