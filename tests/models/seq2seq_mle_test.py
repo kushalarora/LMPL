@@ -2,7 +2,7 @@ import json
 
 from tests import ModelTestCase
 
-class Seq2SeqTest(ModelTestCase):
+class Seq2SeqMLETest(ModelTestCase):
     def setup_method(self):
         super().setup_method()
         self.set_up_model(
