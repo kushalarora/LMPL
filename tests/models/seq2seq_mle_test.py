@@ -6,7 +6,7 @@ class Seq2SeqMLETest(ModelTestCase):
     def setup_method(self):
         super().setup_method()
         self.set_up_model(
-            ModelTestCase.FIXTURES_ROOT / "natural_lang" / "seq2seq.jsonnet",
+            ModelTestCase.FIXTURES_ROOT / "natural_lang" / "seq2seq_mle.jsonnet",
             ModelTestCase.FIXTURES_ROOT / "natural_lang" / "seq2seq_copy.tsv",
         )
 

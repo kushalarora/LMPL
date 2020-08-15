@@ -169,6 +169,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                  detach_rollin_logits: bool = False,
                  rollin_rollout_mixing_coeff: float = 0.25,
                  rollout_reference_policy:str = 'copy',
+                 sort_next_tokens:bool = False,
                 ) -> None:
         super().__init__(
             vocab=vocab,
@@ -231,6 +232,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
 
         self._rollout_reference_policy = rollout_reference_policy
 
+        self._sort_next_tokens = sort_next_tokens
 
     def get_num_tokens_to_rollout(self):
         num_tokens_to_rollout = min(self._num_tokens_to_rollout, self._num_classes)
@@ -256,6 +258,16 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             So that topk or sampling doesn't return masked values 
             and always returns selected values.
         """
+        # If num_tokens_to_rollout >= num_classes, we return all the tokens in logits.
+        # This saves computation. Additionally, torch.multinomial for large 
+        # num_tokens_to_rollout, sometime ends up returning duplicates 
+        # despite replacement=False
+        # See, https://github.com/pytorch/pytorch/issues/25030.
+        if num_tokens_to_rollout >= self._num_classes:
+            batch_size = rollin_logits.size(0)
+            return torch.LongTensor([range(0, self._num_classes)] * batch_size) \
+                            .to(rollin_logits.device)
+
         # step_logits: (batch_size, vocab_size)
         step_logits = rollin_logits[:, step - 1, :].clone().detach()
 
@@ -291,6 +303,10 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         # searnn_next_step_tokens: (batch_size, num_tokens_to_rollout)
         searnn_next_step_tokens = torch.multinomial(step_unnorm_probabilities, 
                                                     num_tokens_to_rollout)
+        
+        if self._sort_next_tokens:
+            searnn_next_step_tokens, _ = torch.sort(searnn_next_step_tokens)
+
         return searnn_next_step_tokens
 
     def get_prediction_prefixes(self, 
@@ -324,6 +340,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         return rollout_steps
 
     def get_rollout_iterator(self, 
+                             rollout_state: Dict[str, torch.Tensor],
                              rollin_logits: torch.FloatTensor,
                              rollin_predictions: torch.LongTensor,
                              rollin_decoder_context: torch.FloatTensor,
@@ -341,7 +358,6 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         self._decoder_net._accumulate_hidden_states = False
 
         for step in rollout_contexts:
-            rollout_state = {}
             searnn_next_step_tokens = self.get_next_tokens(
                                                 rollin_logits=rollin_logits, 
                                                 step=step, 
@@ -447,6 +463,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         targets = extend_targets_by_1(targets)
 
         rollout_output_dict_iter = self.get_rollout_iterator(
+                                                rollout_state=rollout_state,
                                                 rollin_logits=rollin_logits,
                                                 rollin_predictions=rollin_predictions,
                                                 rollin_decoder_context=rollin_decoder_context,
