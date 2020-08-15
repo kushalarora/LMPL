@@ -61,8 +61,7 @@ class ReinforceCriterion(LossCriterion):
 
       # cost_batch: (batch_size )
       cost_batch = self._compute_rollout_cost(
-                            rollout_output_dict=rollout_output_dict
-                        )
+                            rollout_output_dict=rollout_output_dict)
 
       # Only consider those logits which you did rollout for.
       # rollin_logits_prefix: (batch_size, step - 1, num_classes)

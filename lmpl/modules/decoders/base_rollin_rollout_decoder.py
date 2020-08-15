@@ -524,13 +524,18 @@ class BaseRollinRolloutDecoder(SeqDecoder):
 
             output_dict.update(decoder_output_dict)
 
-            output_dict.update(self._loss_criterion(rollin_dict, 
-                                                rollout_dict_iter, 
-                                                state, target_tokens))
+            output_dict.update(self._loss_criterion(
+                                            rollin_output_dict=rollin_dict, 
+                                            rollout_output_dict_iter=rollout_dict_iter, 
+                                            state=state, 
+                                            target_tokens=target_tokens))
 
-            mle_loss_output = self._mle_loss(rollin_dict, 
-                                             rollout_dict_iter,
-                                             state, target_tokens)
+            mle_loss_output = self._mle_loss(
+                                    rollin_output_dict=rollin_dict, 
+                                    rollout_output_dict_iter=rollout_dict_iter, 
+                                    state=state, 
+                                    target_tokens=target_tokens)
+
             mle_loss = mle_loss_output['loss']
             self._perplexity(mle_loss)
 
