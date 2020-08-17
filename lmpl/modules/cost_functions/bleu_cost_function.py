@@ -88,8 +88,8 @@ class BLEUCostFunction(CostFunction):
 
         else:
             predictions, gold_labels, mask = self.unwrap_to_tensors(predictions, gold_labels, mask)
-            bleu_cost = (1.0 - self._scorer.add(gold_labels.type(torch.IntTensor),
-                                                predictions.type(torch.IntTensor)).score())
+            self._scorer.add(gold_labels.type(torch.IntTensor),predictions.type(torch.IntTensor))
+            bleu_cost = 1.0 - self._scorer.score()
 
             self._scorer.reset()
         return bleu_cost
