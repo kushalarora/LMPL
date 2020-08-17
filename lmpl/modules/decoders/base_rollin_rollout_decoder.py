@@ -585,6 +585,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                 if  self._hamming and target_tokens:
                     self._hamming(best_predictions, targets, target_mask)
 
+                    # TODO: #34 Write tests for those.
                     if self._tensor_based_metric is not None:
                         self._tensor_based_metric(  # type: ignore
                             predictions=best_predictions, 
