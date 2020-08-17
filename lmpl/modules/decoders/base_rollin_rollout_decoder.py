@@ -18,6 +18,7 @@ from allennlp.modules import Embedding
 
 from allennlp.nn import util
 from allennlp.training.metrics import BLEU, Perplexity, Average
+from allennlp.training.metrics import Metric
 
 from allennlp_models.generation.modules.seq_decoders import SeqDecoder
 from allennlp_models.generation.modules.decoder_nets import DecoderNet
@@ -117,6 +118,8 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                  top_k=0, 
                  top_p=0,
                  detokenizer: DeTokenizer = default_tokenizer,
+                 tensor_based_metric: Metric = None,
+                 token_based_metric: Metric = None,
                 ) -> None:
         super().__init__(target_embedder)
 
@@ -213,7 +216,11 @@ class BaseRollinRolloutDecoder(SeqDecoder):
 
         self._mle_loss = MaximumLikelihoodLossCriterion()
         self._perplexity = Perplexity()
-        
+
+        # These metrics will be updated during training and validation
+        self._tensor_based_metric = tensor_based_metric
+        self._token_based_metric = token_based_metric
+
     def get_output_dim(self):
         return self._decoder_net.get_output_dim()
 
@@ -555,6 +562,8 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                                         truncate_at_end_all=False)
 
             predicted_tokens = rollout_output_dict["decoded_predictions"]
+            predicted_targets = rollout_output_dict["decoded_targets"]
+
             output_dict.update(rollout_output_dict)
             output_dict["detokenized_predictions"] = \
                             self._detokenizer(predicted_tokens)
@@ -564,16 +573,30 @@ class BaseRollinRolloutDecoder(SeqDecoder):
 
             # shape (best_predictions): (batch_size, num_decoding_steps)
             best_predictions = predictions[:, 0, :]
-            # TODO #3 (Kushal): Maybe abstract out these losses and use loss_metric like AllenNLP uses.
-            if self._bleu and target_tokens:
-                targets = util.get_token_ids_from_text_field_tensors(target_tokens)
-                self._bleu(best_predictions, targets)
 
-            if  self._hamming and target_tokens:
+            if target_tokens:
+                targets = util.get_token_ids_from_text_field_tensors(target_tokens)
                 target_mask = util.get_text_field_mask(target_tokens)
-                targets = util.get_token_ids_from_text_field_tensors(target_tokens)
-                self._hamming(best_predictions, targets, target_mask)
 
+                # TODO #3 (Kushal): Maybe abstract out these losses and use loss_metric like AllenNLP uses.
+                if self._bleu and target_tokens:
+                    self._bleu(best_predictions, targets)
+
+                if  self._hamming and target_tokens:
+                    self._hamming(best_predictions, targets, target_mask)
+
+                    if self._tensor_based_metric is not None:
+                        self._tensor_based_metric(  # type: ignore
+                            predictions=best_predictions, 
+                            gold_targets=targets,
+                            mask=target_mask,
+                        )
+
+                    if self._token_based_metric is not None:
+                        self._token_based_metric(  # type: ignore
+                            predictions=predicted_tokens, 
+                            gold_targets=predicted_targets,
+                        )
         return output_dict
 
     def _decode_tokens(self,
@@ -968,5 +991,13 @@ class BaseRollinRolloutDecoder(SeqDecoder):
 
         if self._hamming and not self.training:
             all_metrics.update({'hamming': self._hamming.get_metric(reset=reset)})
+
+        if not self.training:
+            if self._tensor_based_metric is not None:
+                all_metrics.update(
+                    self._tensor_based_metric.get_metric(reset=reset)  # type: ignore
+                )
+            if self._token_based_metric is not None:
+                all_metrics.update(self._token_based_metric.get_metric(reset=reset))  # type: ignore
 
         return all_metrics
