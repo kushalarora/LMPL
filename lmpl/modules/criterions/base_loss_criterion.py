@@ -136,7 +136,8 @@ class LossCriterion(Registrable):
                                 mask=target_masks)
     
     if 'logits' in rollout_output_dict:
-      cost_batch = cost_batch.to(rollout_output_dict['logits'].dtype)
+      cost_batch = cost_batch.to(rollout_output_dict['logits'].dtype)\
+                              .to(rollout_output_dict['logits'].device)
 
     return cost_batch
 

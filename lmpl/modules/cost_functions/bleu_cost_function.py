@@ -11,20 +11,27 @@ import torch
 
 from lmpl.modules.cost_functions import CostFunction
 
-def init_pool():
-    global scorer
-    scorer = SacrebleuScorer()
-    return scorer
-
-
-def compute_bleu_score(prediction: List[str], 
-                       gold_label: List[str]):
+def compute_bleu_score_decoded(
+                    gold_label: List[str],
+                    prediction: List[str]):
     global scorer
     scorer.add_string(' '.join(gold_label),
                       ' '.join(prediction))
-    score = scorer.score()/100.0 + 1e-45
+    score = 1 - scorer.score()/100.0
     scorer.reset()
     return score
+
+def compute_bleu_score(
+            gold_label: torch.IntTensor,
+            prediction: torch.IntTensor
+):
+    global scorer
+    scorer.add(gold_label.type(torch.IntTensor),
+                prediction.type(torch.IntTensor))
+    score = 1.0 - scorer.score()/100.
+    scorer.reset()
+    return score
+
 
 @CostFunction.register("bleu")
 class BLEUCostFunction(CostFunction):
@@ -44,17 +51,29 @@ class BLEUCostFunction(CostFunction):
         self._num_threads = num_threads
 
         self._use_parallel = use_parallel
+        
+        if use_parallel:
+            def decoded_init_pool():
+                global scorer
+                scorer = SacrebleuScorer()
+                return scorer
 
-        if use_decoded_inputs:
-            if use_parallel:
-                self._pool = Pool(self._num_threads, 
-                                  init_pool)
-            else:
-                self._scorer = SacrebleuScorer()
-        else:
-            self._scorer = Scorer(pad_token,
+            def init_pool():
+                global scorer
+                scorer = Scorer(pad_token,
                                 eos_token,
                                 unk_token)
+                return scorer
+
+            self._pool = Pool(self._num_threads, 
+                                decoded_init_pool if use_decoded_inputs else init_pool)
+        
+        if use_decoded_inputs:
+            self._scorer = SacrebleuScorer()
+        else:
+            self._scorer = Scorer(pad_token,
+                                    eos_token,
+                                    unk_token)
 
         self._use_decoded_inputs = use_decoded_inputs
 
@@ -75,24 +94,20 @@ class BLEUCostFunction(CostFunction):
         bleu_costs = []
         if self._use_decoded_inputs:
             if self._use_parallel:
-                bleu_costs = self._pool.starmap(compute_bleu_score, zip(predictions, gold_labels))
+                bleu_costs = self._pool.starmap(compute_bleu_score_decoded, zip(gold_labels, predictions))
             else:
-                for ref, pred  in zip(gold_labels, 
-                                    predictions):
-                    self._scorer.add_string(' '.join(ref),
-                                            ' '.join(pred))
-                    bleu_costs.append(self._scorer.score()/100.0 + 1e-45)
-                    self._scorer.reset()
-            
-            bleu_cost =  (1.0 - torch.tensor(bleu_costs)).to(torch.cuda.current_device() if torch.cuda.is_available() else 'cpu')
+                for ref, pred  in zip(gold_labels, predictions):
+                  bleu_costs.append(compute_bleu_score_decoded(ref, pred))
 
         else:
             predictions, gold_labels, mask = self.unwrap_to_tensors(predictions, gold_labels, mask)
-            self._scorer.add(gold_labels.type(torch.IntTensor),predictions.type(torch.IntTensor))
-            bleu_cost = 1.0 - self._scorer.score()
-
-            self._scorer.reset()
-        return bleu_cost
+            if self._use_parallel:
+                bleu_costs = self._pool.starmap(compute_bleu_score, zip(gold_labels, predictions))
+            else:
+                for prediction,gold_label in zip(predictions, gold_labels):
+                    bleu_costs.append(compute_bleu_score(gold_label, prediction))
+             
+        return torch.tensor(bleu_costs)
 
     @overrides
     def takes_decoded_input(self):
