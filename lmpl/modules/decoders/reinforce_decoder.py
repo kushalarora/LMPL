@@ -56,6 +56,8 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
                  top_k=0, 
                  top_p=0,
                  detokenizer: DeTokenizer = default_tokenizer,
+                 tensor_based_metric: Metric = None,
+                 token_based_metric: Metric = None,
 
                  rollin_steps: int = 50,
                  rollout_mixing_prob: float = 0.5,
@@ -96,6 +98,8 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
             top_k=top_k,
             top_p=top_p,
             detokenizer=detokenizer,
+            tensor_based_metric=tensor_based_metric,
+            token_based_metric=token_based_metric,
 
             rollin_mode='teacher_forcing',
             rollout_mode='learned',
