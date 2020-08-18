@@ -3,6 +3,8 @@ from typing import Dict, Optional, Tuple, Union, List
 from fairseq.bleu import Scorer, SacrebleuScorer
 from overrides import overrides
 
+from functools import partial
+
 from allennlp.common.util import END_SYMBOL
 from allennlp.data.vocabulary import DEFAULT_PADDING_TOKEN, DEFAULT_OOV_TOKEN
 from multiprocessing import Pool
@@ -22,8 +24,8 @@ def compute_bleu_score_decoded(
     return score
 
 def compute_bleu_score(
-            gold_label: torch.IntTensor,
-            prediction: torch.IntTensor
+            gold_label: torch.LongTensor,
+            prediction: torch.LongTensor
 ):
     global scorer
     scorer.add(gold_label.type(torch.IntTensor),
@@ -32,6 +34,18 @@ def compute_bleu_score(
     scorer.reset()
     return score
 
+def decoded_init_pool():
+    global scorer
+    scorer = SacrebleuScorer()
+    return scorer
+
+def init_pool(pad_token, eos_token, unk_token):
+    global scorer
+    scorer = Scorer(pad_token,
+                    eos_token,
+                    unk_token)
+    return scorer
+            
 
 @CostFunction.register("bleu")
 class BLEUCostFunction(CostFunction):
@@ -51,29 +65,23 @@ class BLEUCostFunction(CostFunction):
         self._num_threads = num_threads
 
         self._use_parallel = use_parallel
-        
+
+
         if use_parallel:
-            def decoded_init_pool():
-                global scorer
-                scorer = SacrebleuScorer()
-                return scorer
-
-            def init_pool():
-                global scorer
-                scorer = Scorer(pad_token,
-                                eos_token,
-                                unk_token)
-                return scorer
-
             self._pool = Pool(self._num_threads, 
-                                decoded_init_pool if use_decoded_inputs else init_pool)
+                                decoded_init_pool \
+                                    if use_decoded_inputs else \
+                                        partial(init_pool, 
+                                                pad_token=pad_token,
+                                                eos_token=eos_token,
+                                                unk_token=unk_token))
         
         if use_decoded_inputs:
-            self._scorer = SacrebleuScorer()
+            decoded_init_pool()
         else:
-            self._scorer = Scorer(pad_token,
-                                    eos_token,
-                                    unk_token)
+            init_pool(pad_token,
+                        eos_token,
+                        unk_token)
 
         self._use_decoded_inputs = use_decoded_inputs
 

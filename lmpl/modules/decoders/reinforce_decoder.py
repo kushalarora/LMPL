@@ -10,6 +10,7 @@ from allennlp.common.util import START_SYMBOL, END_SYMBOL
 from allennlp.data.vocabulary import Vocabulary, DEFAULT_OOV_TOKEN, DEFAULT_PADDING_TOKEN
 from allennlp.modules import Embedding
 from allennlp.nn import util
+from allennlp.training.metrics import Metric
 
 from allennlp_models.generation.modules.decoder_nets import DecoderNet
 from allennlp_models.generation.modules.seq_decoders import SeqDecoder

@@ -133,7 +133,7 @@ class TestBaseLossCriterion(AllenNlpTestCase):
       
     output_dict = criterion(rollin_dict, rollout_dict, 
                                     state, target_tokens)
-    assert output_dict['loss'] == 1.5
+    assert output_dict['loss'] - 1.5  < 1e-10
 
   def test_compute_rollout_cost_batch(self):    
     # takes_decoded_input=False
@@ -152,7 +152,7 @@ class TestBaseLossCriterion(AllenNlpTestCase):
     hamming_loss = criterion._compute_rollout_cost(
                                     rollout_output_dict)
 
-    assert torch.all(hamming_loss == torch.tensor([0.0, 0.]))
+    assert torch.all(hamming_loss - torch.tensor([0.0, 0.]) < 1e-10)
     
     rollout_output_dict = {
       'predictions': torch.LongTensor([[[1, 2, 3, 4, 5]], 
@@ -171,7 +171,7 @@ class TestBaseLossCriterion(AllenNlpTestCase):
 
     # First entry of the batch is same, second entry has all different
     # except for 8 and we will mask last entry, so, error rate is 3/4.
-    assert torch.all(hamming_loss == torch.tensor([0.0, 0.75]))
+    assert torch.all(hamming_loss - torch.tensor([0.0, 0.75]) < 1e-10)
 
     # takes_decoded_input=True
     rollout_output_dict = {
@@ -184,11 +184,11 @@ class TestBaseLossCriterion(AllenNlpTestCase):
     criterion = LossCriterion(
                     rollout_cost_function=BLEUCostFunction(),
                     shall_compute_rollout_loss=True)
-    
+
     bleu_loss = criterion._compute_rollout_cost(
                                     rollout_output_dict)
 
-    assert torch.all(bleu_loss == torch.tensor([0.0, 0.]))
+    assert torch.all(bleu_loss - torch.tensor([0.0, 0.]) < 1e-10)
 
 
 
