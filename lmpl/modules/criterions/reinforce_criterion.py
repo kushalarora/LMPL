@@ -17,7 +17,7 @@ class ReinforceCriterion(LossCriterion):
           rollin_rollout_mixing_coeff:float = 0.,
           labeling_smooting_ratio: float = None,
           temperature: float = 1, 
-          detach_rollin_logits: bool = True
+          detach_rollin_logits: bool = True,
           warm_start_for_epochs: int = -1, 
           warm_start_for_batch_numbers: int = -1,
         ):
