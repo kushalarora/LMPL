@@ -18,6 +18,7 @@ from allennlp.modules import Embedding
 
 from allennlp.nn import util
 from allennlp.training.metrics import BLEU, Perplexity, Average
+from allennlp.training.metrics import Metric
 
 from allennlp_models.generation.modules.decoder_nets import DecoderNet
 from allennlp_models.generation.modules.seq_decoders import SeqDecoder
@@ -98,7 +99,8 @@ class LMPLAutoRegressiveSeqDecoder(BaseRollinRolloutDecoder):
                  top_k=0, 
                  top_p=0,
                  detokenizer: DeTokenizer = default_tokenizer,
-                ) -> None:
+                 tensor_based_metric: Metric = None,
+                 token_based_metric: Metric = None,                ) -> None:
         super().__init__(
             vocab=vocab,
             max_decoding_steps=max_decoding_steps,
@@ -130,6 +132,8 @@ class LMPLAutoRegressiveSeqDecoder(BaseRollinRolloutDecoder):
             top_k=top_k,
             top_p=top_p,
             detokenizer=detokenizer,
+            tensor_based_metric=tensor_based_metric,
+            token_based_metric=token_based_metric,
         )
 
     def _forward_loop(self,
