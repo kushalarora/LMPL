@@ -27,6 +27,7 @@ emnlp_gpt2_rl_config + {
         },
       },
       "trainer"+: {
+        "num_epochs": 10,
         "validation_metric": "-loss",
       },
     }

@@ -63,7 +63,7 @@
     }
   },
   "trainer": {
-    "num_epochs": 2,
+    "num_epochs": 1,
     "cuda_device" : -1,
     "validation_metric": "-perplexity",
     "optimizer": {
@@ -80,5 +80,6 @@
     "checkpointer": {
       "num_serialized_models_to_keep": 1,
     },
+    "batch_callbacks": ["update_epoch_iter"],
   }
 }

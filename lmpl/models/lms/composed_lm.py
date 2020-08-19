@@ -61,6 +61,9 @@ class ComposedLMBase(Model):
 
         super().__init__(vocab, regularizer)
 
+        self.epoch = 0
+        self.batch_number = 0
+
         self._seq2seq_mode = use_in_seq2seq_mode
         self._decoder = decoder
         
@@ -123,7 +126,10 @@ class ComposedLMBase(Model):
         Dict[str, torch.Tensor]
             The output tensors from the decoder.
         """
-        state:  Dict[str, torch.Tensor] = {}
+        state:  Dict[str, torch.Tensor] = {
+                            "epoch": self.epoch,
+                            "batch_number": self.batch_number,
+                           }
         if self._seq2seq_mode:
             state.update(self._encode(source_tokens))
         return self._decoder(state, target_tokens)

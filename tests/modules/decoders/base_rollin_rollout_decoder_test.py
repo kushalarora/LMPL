@@ -265,7 +265,8 @@ class TestBaseRollinRolloutDecoder(AllenNlpTestCase):
             {'tokens': {'tokens': torch.LongTensor([[5,6,7,8,4], 
                                                     [8,7,6,5,4]])}}
         last_predictions = torch.LongTensor([3, 4])
-        state = {}
+        state = {'epoch': 1, 
+                 'batch_number': 1,}
         
         # Test case when timestep < seq_len
         decoder = build_decoder(decoder_input_dim, 
@@ -313,7 +314,8 @@ class TestBaseRollinRolloutDecoder(AllenNlpTestCase):
                 'tokens': torch.LongTensor([[5,6,7,8,4], 
                                             [8,7,6,5,4]])}}
         last_predictions = torch.LongTensor([3, 4])
-        state = {}
+        state = {'epoch': 1, 
+                 'batch_number': 1,}
         
         token_at_timstep = torch.LongTensor([3, 7])
         timestep=2

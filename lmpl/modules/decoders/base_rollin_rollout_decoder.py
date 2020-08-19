@@ -490,12 +490,12 @@ class BaseRollinRolloutDecoder(SeqDecoder):
         state: Dict[str, torch.Tensor] = {}
         decoder_init_state: Dict[str, torch.Tensor] = {}
 
+        state = copy.copy(encoder_out)
         # In Seq2Seq setting, we will encode the source sequence,
         # and init the state object with encoder output and decoder
         # cell will use these encoder outputs for attention/initing
         # the decoder states.
         if self._seq2seq_mode:
-            state = encoder_out
             decoder_init_state = \
                         self._decoder_net.init_decoder_state(state)
             state.update(decoder_init_state)
@@ -552,7 +552,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
             # While validating or testing we need to roll out the learned policy and the output
             # of this rollout is used to compute the secondary metrics
             # like BLEU.
-            state = encoder_out
+            state = copy.copy(encoder_out)
             state.update(decoder_init_state)
 
             rollout_output_dict = self.rollout(state,
