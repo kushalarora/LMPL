@@ -156,6 +156,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                  top_p=0,
                  detokenizer: DeTokenizer = default_tokenizer,
                  tensor_based_metric: Metric = None,
+                 tensor_based_metric_mask: Metric = None,
                  token_based_metric: Metric = None,
 
                  rollin_mode: str = 'teacher_forcing',
@@ -205,6 +206,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             top_p=top_p,
             detokenizer=detokenizer,
             tensor_based_metric=tensor_based_metric,
+            tensor_based_metric_mask=tensor_based_metric_mask,
             token_based_metric=token_based_metric,
 
             rollin_mode=rollin_mode,

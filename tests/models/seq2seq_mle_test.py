@@ -49,3 +49,9 @@ class Seq2SeqMLETest(ModelTestCase):
         output_dict = self.model(**training_tensors)
         decode_output_dict = self.model.make_output_human_readable(output_dict)
         assert "predicted_tokens" in decode_output_dict
+
+    def test_with_tensor_based_metric(self):
+        param_overrides = json.dumps({"model": {"decoder": {"tensor_based_metric": "bleu"}}})
+        self.ensure_model_can_train_save_and_load(
+            self.param_file, tolerance=1e-2, overrides=param_overrides
+        )
