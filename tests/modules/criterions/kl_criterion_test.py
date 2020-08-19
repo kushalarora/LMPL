@@ -10,7 +10,8 @@ class TestKLLossCriterion(AllenNlpTestCase):
   def test_loss_criterion(self):
     rollin_dict = {}
     rollout_dict = {}
-    state = {}
+    state = {'epoch': 1, 
+             'batch_number': 1,}
     target_tokens = {'tokens':
           {'tokens': torch.LongTensor([[1,2,3,4,9,10,11,12],
                                        [5,6,7,8,13,14,15,16]])}}

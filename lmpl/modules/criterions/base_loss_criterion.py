@@ -15,12 +15,16 @@ class LossCriterion(Registrable):
           shall_compute_rollin_loss: bool = False, 
           shall_compute_rollout_loss: bool = False, 
           rollin_rollout_mixing_coeff: float = 0., 
+          warm_start_for_epochs: int = -1, 
+          warm_start_for_batch_numbers: int = -1,
         ):
     self._rollout_cost_function = rollout_cost_function
     self._shall_compute_rollin_loss = shall_compute_rollin_loss
     self._shall_compute_rollout_loss = shall_compute_rollout_loss
     self._rollin_rollout_mixing_coeff = rollin_rollout_mixing_coeff
     self._labeling_smooting_ratio = labeling_smooting_ratio
+    self._warm_start_for_epochs = warm_start_for_epochs
+    self._warm_start_for_batch_numbers = warm_start_for_batch_numbers
 
   def __call__(self,
               rollin_output_dict: Dict[str, torch.Tensor],
@@ -41,19 +45,56 @@ class LossCriterion(Registrable):
           output_dict {Dict[str, torch.LongTensor]} -- Updated outptut dict with global and local
                                                       loss combined.
     """
+    output_dict = {}
+    loss_batch = self._compute_loss_batch(
+                            rollin_output_dict=rollin_output_dict, 
+                            rollout_output_dict_iter=rollout_output_dict_iter,
+                            state=state,
+                            target_tokens=target_tokens
+                          )
+
+    # This assumes target_mask was applied to loss
+    # before loss_batch computation.
+    if target_tokens:
+      target_mask = util.get_text_field_mask(target_tokens)
+      # shape : (batch_size,)
+      target_mask = target_mask[:, 1:]
+      non_batch_dims = tuple(range(1, len(target_mask.shape)))
+
+      target_mask_sum = target_mask.sum(dim=non_batch_dims)
+      num_non_empty_sequences = ((target_mask_sum > 0).sum() + 1e-13)
+      loss = loss_batch.sum()/num_non_empty_sequences
+      output_dict['loss'] = loss
+    else:
+      output_dict['loss'] = loss_batch.mean()
+    return output_dict
+
+  def _compute_loss_batch(self,
+              rollin_output_dict: Dict[str, torch.Tensor],
+              rollout_output_dict_iter: Iterable[Dict[str, Union[torch.Tensor, int]]],
+              state: Dict[str, torch.Tensor],
+              target_tokens: Dict[str, torch.Tensor] = None) -> torch.FloatTensor:
+
+    epoch: int = state['epoch']
+    batch_number: int = state['batch_number']
 
     assert self._shall_compute_rollin_loss or \
             self._shall_compute_rollout_loss, \
             "We need to either compute rollin or rollout losses. Both" + \
               "shall_compute_rollin_loss and shall_compute_rollout_loss cannot be false."
 
-    output_dict = {}
     rollin_loss_batch = 0
-    if self._shall_compute_rollin_loss:
+    if epoch < self._warm_start_for_epochs or \
+        batch_number < self._warm_start_for_batch_numbers or \
+          self._shall_compute_rollin_loss:
       rollin_loss_batch = self._compute_rollin_loss_batch(
                                     rollin_output_dict=rollin_output_dict, 
                                     state=state, 
                                     target_tokens=target_tokens)
+
+    if epoch < self._warm_start_for_epochs or \
+        batch_number < self._warm_start_for_batch_numbers:
+        return rollin_loss_batch
 
     rollout_loss_batch = 0
     if self._shall_compute_rollout_loss:
@@ -75,21 +116,7 @@ class LossCriterion(Registrable):
       f"rollin_loss_batch: {rollin_loss_batch}," + \
         f"rollout_loss_batch: {rollout_loss_batch}"
 
-    # This assumes target_mask was applied to loss
-    # before loss_batch computation.
-    if target_tokens:
-      target_mask = util.get_text_field_mask(target_tokens)
-      # shape : (batch_size,)
-      target_mask = target_mask[:, 1:]
-      non_batch_dims = tuple(range(1, len(target_mask.shape)))
-
-      target_mask_sum = target_mask.sum(dim=non_batch_dims)
-      num_non_empty_sequences = ((target_mask_sum > 0).sum() + 1e-13)
-      loss = loss_batch.sum()/num_non_empty_sequences
-      output_dict['loss'] = loss
-    else:
-      output_dict['loss'] = loss_batch.mean()
-    return output_dict
+    return loss_batch
 
   def _compute_rollout_loss_batch(self,
               rollin_output_dict: Dict[str, torch.Tensor],

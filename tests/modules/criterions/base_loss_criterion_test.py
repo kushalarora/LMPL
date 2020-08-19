@@ -13,7 +13,8 @@ class TestBaseLossCriterion(AllenNlpTestCase):
   def test_loss_criterion(self):
     rollin_dict = {}
     rollout_dict = {}
-    state = {}
+    state = {'epoch': 1, 
+             'batch_number': 1,}
     target_tokens = {'tokens':
           {'tokens': torch.LongTensor([[1,2,3,4],
                                        [5,6,7,8]])}}
@@ -77,7 +78,8 @@ class TestBaseLossCriterion(AllenNlpTestCase):
   def test_atleast_one_rollin_rollout_should_be_computed(self):
     rollin_dict = {}
     rollout_dict = {}
-    state = {}
+    state = {'epoch': 1, 
+             'batch_number': 1,}
     target_tokens = {'tokens':
           {'tokens': torch.LongTensor([[1,2,3,4],
                                        [5,6,7,8]])}}
@@ -91,7 +93,8 @@ class TestBaseLossCriterion(AllenNlpTestCase):
   def test_rollin_rollout_mixing_coeff_should_be_bw_0_1(self):
     rollin_dict = {}
     rollout_dict = {}
-    state = {}
+    state = {'epoch': 1, 
+             'batch_number': 1,}
     target_tokens = {'tokens':
           {'tokens': torch.LongTensor([[1,2,3,4],
                                        [5,6,7,8]])}}
@@ -190,7 +193,86 @@ class TestBaseLossCriterion(AllenNlpTestCase):
 
     assert torch.all(bleu_loss - torch.tensor([0.0, 0.]) < 1e-10)
 
+  def test_warm_start_for_epoch(self):
+    rollin_dict = {}
+    rollout_dict = {}
+    state = {'epoch': 1, 
+             'batch_number': 1,}
+    target_tokens = {'tokens':
+          {'tokens': torch.LongTensor([[1,2,3,4],
+                                       [5,6,7,8]])}}
 
+    # Test w/ target_tokens without padding.
+    criterion = LossCriterion(
+                    shall_compute_rollin_loss=False,
+                    shall_compute_rollout_loss=True, 
+                    rollin_rollout_mixing_coeff=0.,
+                    warm_start_for_epochs=10)
+
+    criterion._compute_rollin_loss_batch = \
+      lambda rollin_output_dict,state,target_tokens: torch.FloatTensor([1.,3.])
+    
+    criterion._compute_rollout_loss_batch = \
+      lambda rollin_output_dict,rollout_output_dict_iter,state,target_tokens: \
+                                                          torch.FloatTensor([0., 2.])
+    target_tokens = {'tokens':
+      {'tokens': torch.LongTensor([[1,2,3,4],
+                                    [5,6,7,8]])}}
+
+    state = {'epoch': 1, 
+             'batch_number': 1,}
+    output_dict = criterion(rollin_dict, rollout_dict, 
+                                  state, target_tokens)
+
+    assert output_dict['loss'] == 2.
+
+    state = {'epoch': 11,
+          'batch_number': 1,}
+    output_dict = criterion(rollin_dict, rollout_dict, 
+                                  state, target_tokens)
+
+    assert output_dict['loss'] == 1.
+
+  def test_warm_start_for_batch_number(self):
+    rollin_dict = {}
+    rollout_dict = {}
+    state = {'epoch': 1, 
+             'batch_number': 1,}
+    target_tokens = {'tokens':
+          {'tokens': torch.LongTensor([[1,2,3,4],
+                                       [5,6,7,8]])}}
+
+    # Test w/ target_tokens without padding.
+    criterion = LossCriterion(
+                    shall_compute_rollin_loss=False,
+                    shall_compute_rollout_loss=True, 
+                    rollin_rollout_mixing_coeff=0.,
+                    warm_start_for_batch_numbers=10)
+
+    criterion._compute_rollin_loss_batch = \
+      lambda rollin_output_dict,state,target_tokens: torch.FloatTensor([1.,3.])
+    
+    criterion._compute_rollout_loss_batch = \
+      lambda rollin_output_dict,rollout_output_dict_iter,state,target_tokens: \
+                                                          torch.FloatTensor([0., 2.])
+    target_tokens = {'tokens':
+      {'tokens': torch.LongTensor([[1,2,3,4],
+                                    [5,6,7,8]])}}
+
+    
+    state = {'epoch': 1, 
+             'batch_number': 1,}
+    output_dict = criterion(rollin_dict, rollout_dict, 
+                                  state, target_tokens)
+
+    assert output_dict['loss'] == 2.
+
+    state = {'epoch': 1, 
+             'batch_number': 11,}    
+    output_dict = criterion(rollin_dict, rollout_dict, 
+                                  state, target_tokens)
+
+    assert output_dict['loss'] == 1.
 
   @pytest.mark.skip(reason="not implemented")
   def test_get_cross_entropy_loss(self):
