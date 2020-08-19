@@ -119,6 +119,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                  top_p=0,
                  detokenizer: DeTokenizer = default_tokenizer,
                  tensor_based_metric: Metric = None,
+                 tensor_based_metric_mask: Metric = None,
                  token_based_metric: Metric = None,
                 ) -> None:
         super().__init__(target_embedder)
@@ -220,6 +221,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
         # These metrics will be updated during training and validation
         self._tensor_based_metric = tensor_based_metric
         self._token_based_metric = token_based_metric
+        self._tensor_based_metric_mask = tensor_based_metric_mask
 
     def get_output_dim(self):
         return self._decoder_net.get_output_dim()
@@ -561,12 +563,11 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                                         # TODO #6 (Kushal): Add a reason why truncate_at_end_all is False here.
                                         truncate_at_end_all=False)
 
-            predicted_tokens = rollout_output_dict["decoded_predictions"]
-            predicted_targets = rollout_output_dict["decoded_targets"]
-
             output_dict.update(rollout_output_dict)
+
+            decoded_predictions = rollout_output_dict["decoded_predictions"]
             output_dict["detokenized_predictions"] = \
-                            self._detokenizer(predicted_tokens)
+                            self._detokenizer(decoded_predictions)
 
             # shape (predictions): (batch_size, beam_size, num_decoding_steps)
             predictions = rollout_output_dict['predictions']
@@ -577,6 +578,9 @@ class BaseRollinRolloutDecoder(SeqDecoder):
             if target_tokens:
                 targets = util.get_token_ids_from_text_field_tensors(target_tokens)
                 target_mask = util.get_text_field_mask(target_tokens)
+                decoded_targets = self._decode_tokens(targets,
+                                        vocab_namespace=self._target_namespace,
+                                        truncate=True)
 
                 # TODO #3 (Kushal): Maybe abstract out these losses and use loss_metric like AllenNLP uses.
                 if self._bleu and target_tokens:
@@ -585,18 +589,22 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                 if  self._hamming and target_tokens:
                     self._hamming(best_predictions, targets, target_mask)
 
-                    # TODO: #34 Write tests for those.
-                    if self._tensor_based_metric is not None:
-                        self._tensor_based_metric(  # type: ignore
-                            predictions=best_predictions, 
-                            gold_targets=targets,
-                            mask=target_mask,
-                        )
+                if self._tensor_based_metric is not None:
+                    self._tensor_based_metric(  # type: ignore
+                        predictions=best_predictions,
+                        gold_targets=targets,
+                    )
+                if self._tensor_based_metric_mask is not None:
+                    self._tensor_based_metric_mask(  # type: ignore
+                        predictions=best_predictions,
+                        gold_targets=targets,
+                        mask=target_mask,
+                    )
 
-                    if self._token_based_metric is not None:
-                        self._token_based_metric(  # type: ignore
-                            predictions=predicted_tokens, 
-                            gold_targets=predicted_targets,
+                if self._token_based_metric is not None:
+                    self._token_based_metric(  # type: ignore
+                            predictions=decoded_predictions, 
+                            gold_targets=decoded_targets,
                         )
         return output_dict
 
@@ -799,6 +807,13 @@ class BaseRollinRolloutDecoder(SeqDecoder):
         predicted_tokens = self._decode_tokens(step_predictions,
                                         vocab_namespace=self._target_namespace,
                                         truncate=True)
+        output_dict = {
+            "predictions": step_predictions,
+            "prediction_masks": step_prediction_masks,
+            "decoded_predictions": predicted_tokens,
+            "logits": logits,
+            "class_log_probabilities": log_probabilities,
+        }
 
         decoded_targets = None
         step_targets = None
@@ -812,18 +827,12 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                                         vocab_namespace=self._target_namespace,
                                         truncate=True)
             step_target_masks = util.get_text_field_mask({'tokens': {'tokens': step_targets}})
-
-        output_dict = {
-            "predictions": step_predictions,
-            "prediction_masks": step_prediction_masks,
-            "decoded_predictions": predicted_tokens,
-            "targets": step_targets,
-            "target_masks": step_target_masks,
-            "decoded_targets": decoded_targets,
-            "logits": logits,
-            "class_log_probabilities": log_probabilities,
-        }
-
+            
+            output_dict.update({
+                "targets": step_targets,
+                "target_masks": step_target_masks,
+                "decoded_targets": decoded_targets,
+            })
         return output_dict
 
     def compute_sentence_probs(self,

@@ -100,7 +100,9 @@ class LMPLAutoRegressiveSeqDecoder(BaseRollinRolloutDecoder):
                  top_p=0,
                  detokenizer: DeTokenizer = default_tokenizer,
                  tensor_based_metric: Metric = None,
-                 token_based_metric: Metric = None,                ) -> None:
+                 tensor_based_metric_mask: Metric = None,
+                 token_based_metric: Metric = None,
+                ) -> None:
         super().__init__(
             vocab=vocab,
             max_decoding_steps=max_decoding_steps,
@@ -133,6 +135,7 @@ class LMPLAutoRegressiveSeqDecoder(BaseRollinRolloutDecoder):
             top_p=top_p,
             detokenizer=detokenizer,
             tensor_based_metric=tensor_based_metric,
+            tensor_based_metric_mask=tensor_based_metric_mask,
             token_based_metric=token_based_metric,
         )
 
