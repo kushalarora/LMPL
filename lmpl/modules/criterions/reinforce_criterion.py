@@ -18,13 +18,18 @@ class ReinforceCriterion(LossCriterion):
           labeling_smooting_ratio: float = None,
           temperature: float = 1, 
           detach_rollin_logits: bool = True
+          warm_start_for_epochs: int = -1, 
+          warm_start_for_batch_numbers: int = -1,
         ):
     super().__init__(
                 rollout_cost_function=rollout_cost_function,
                 labeling_smooting_ratio=labeling_smooting_ratio,
                 rollin_rollout_mixing_coeff=rollin_rollout_mixing_coeff,
                 shall_compute_rollin_loss=(rollin_rollout_mixing_coeff > 0),
-                shall_compute_rollout_loss=True)
+                shall_compute_rollout_loss=True,
+                warm_start_for_epochs=warm_start_for_epochs,
+                warm_start_for_batch_numbers=warm_start_for_batch_numbers,
+              )
     
     self._temperature = temperature
     self._loss = torch.nn.KLDivLoss(reduction='none')
