@@ -23,7 +23,6 @@ rl_config + {
         },
       },
       "trainer"+: {
-        "validation_metric": "-loss",
-        "num_epochs": 5,
+        "num_epochs": 10,
       },
     }

@@ -20,9 +20,6 @@ from lmpl.modules.criterions import LossCriterion
 from lmpl.modules.detokenizers.detokenizer import DeTokenizer, default_tokenizer
 from lmpl.modules.utils import expand_tensor
 
-torch.autograd.set_detect_anomaly(True)
-
-
 @SeqDecoder.register("lmpl_reinforce_decoder")
 class LMPLReinforceDecoder(LMPLSEARNNDecoder):
 
@@ -111,6 +108,7 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
             num_tokens_to_rollout=1,
             num_neighbors_to_add=0,
             do_max_rollout_steps=do_max_rollout_steps,
+            rollout_iter_function=lambda x: range(1, x),
             mask_padding_and_start=False,
             must_include_target_token=False,
             rollout_ratio=rollout_ratio,

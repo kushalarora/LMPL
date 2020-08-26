@@ -358,7 +358,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                              ) -> Iterable[Dict[str, Union[torch.Tensor, int]]]:
         """ Get rollout iterator.
         """
-        context_iter=self._rollout_iter_function(num_decoding_steps + 1)
+        context_iter=self._rollout_iter_function(num_decoding_steps)
         rollout_contexts = get_contexts_to_rollout(rollout_ratio=self._rollout_ratio,
                                                     num_decoding_steps=num_decoding_steps,
                                                     context_iterator=context_iter)
