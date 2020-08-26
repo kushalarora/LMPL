@@ -67,8 +67,8 @@ def reshape_decoder_hidden_and_context(state: Dict[str, torch.Tensor],
                                         step:int, num_tokens_to_rollout:int):
     # decoder_hidden_step: (batch_size, hidden_state_size)
     # decoder_context_step: (batch_size, hidden_state_size)
-    decoder_hidden_step = rollin_decoder_hiddens[:, step - 1, :]
-    decoder_context_step = rollin_decoder_context[:, step - 1, :]
+    decoder_hidden_step = rollin_decoder_hiddens[:, step, :]
+    decoder_context_step = rollin_decoder_context[:, step, :]
 
     # decoder_hidden_step_expanded: (batch_size *  num_tokens_to_rollout, 1, hidden_state_size)
     decoder_hidden_step_expanded = expand_tensor(decoder_hidden_step,
