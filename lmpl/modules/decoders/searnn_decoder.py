@@ -265,6 +265,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             So that topk or sampling doesn't return masked values 
             and always returns selected values.
         """
+        add_noise = False
         # If num_tokens_to_rollout >= num_classes, we return all the tokens in logits.
         # This saves computation. Additionally, torch.multinomial for large 
         # num_tokens_to_rollout, sometime ends up returning duplicates 
@@ -286,7 +287,8 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                                                     num_decoding_steps, 
                                                     step, targets)
             step_logits.scatter_(dim=1, index=neighbor_tokens, value=1e2)
-        
+            add_noise = True
+
         # These masks should be done after sampling and including 
         # random words and neighbors as they might include start,
         # EOS and padding tokens, we should do this after selecting those.
@@ -295,6 +297,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             # rollout_masks: (batch_size, num_tokens_to_mask)
             rollout_masks = self._rollout_mask.expand(step_logits.size(0), -1)
             step_logits.scatter_(dim=1, index=rollout_masks, value=-1e2)
+            add_noise = True
 
         if self._must_include_target_token:
             # target_token: (batch_size, 1)
@@ -304,8 +307,11 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         # softmax of masked step logits + some noise to break ties while topk.
         # noise: (batch_size, vocab_size)
         # step_unnorm_probabilities: (batch_size, vocab_size)
-        noise = 1e-5 * torch.empty_like(step_logits).uniform_(0,1)
-        step_unnorm_probabilities = F.softmax(step_logits, dim=-1) + noise
+        step_unnorm_probabilities = F.softmax(step_logits, dim=-1)
+        
+        if add_noise:
+            noise = 1e-5 * torch.empty_like(step_logits).uniform_(0,1)
+            step_unnorm_probabilities += noise
 
         # searnn_next_step_tokens: (batch_size, num_tokens_to_rollout)
         searnn_next_step_tokens = torch.multinomial(step_unnorm_probabilities, 

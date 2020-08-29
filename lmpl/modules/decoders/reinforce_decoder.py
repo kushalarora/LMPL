@@ -110,7 +110,7 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
             do_max_rollout_steps=do_max_rollout_steps,
             rollout_iter_function=lambda x: range(1, x),
             mask_padding_and_start=False,
-            must_include_target_token=False,
+            must_include_target_token=True,
             rollout_ratio=rollout_ratio,
             detach_rollin_logits=detach_rollin_logits,
             rollin_rollout_mixing_coeff=rollin_rollout_mixing_coeff,
