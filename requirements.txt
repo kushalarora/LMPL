@@ -1,13 +1,5 @@
-setuptools
-cython==0.29.14
-# comet_ml==3.1.11
-numpy==1.18.1
-spacy==2.2.0
-transformers==2.11.0
-sacrebleu==1.4.4
-torch==1.5.1
-torchvision
+wandb
 fairseq==0.9.0
 python-Levenshtein==0.12.0
-allennlp==1.0.0
-allennlp-models==1.0.0
+allennlp==v1.1.0rc4
+allennlp-models==v1.1.0rc4
