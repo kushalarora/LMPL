@@ -18,11 +18,9 @@ rl_config + {
           "type": "lmpl_reinforce_decoder",
           "generation_batch_size": 128,
           "loss_criterion": loss_criterion,
-          "rollout_ratio": 0.10,
+          "rollout_ratio": 0.20,
           "rollin_rollout_mixing_coeff": 0.5,
           "detach_rollin_logits": false,
-          "dropout": 0.2,
-
         },
         // "initializer": {
         //   "regexes": [
@@ -41,6 +39,20 @@ rl_config + {
         },
       },
       "trainer"+: {
-        "num_epochs": 50, 
+        "num_epochs": 50,
+        "grad_clipping": 1.0,
+        "grad_norm": 100.0,
+        "optimizer": {
+          "type": "sgd",
+          "lr": 0.5,
+          "momentum": 0.95,
+        },
+        "epoch_callbacks": [{
+          "type": 'log_metrics_to_wandb',
+          "project_name": "lmpl_debug",
+          "run_name": "reinforce",
+          "sync_tensorboard": false,
+        },],
+        // "num_gradient_accumulation_steps": 0,
       },
     }

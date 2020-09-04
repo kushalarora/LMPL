@@ -1,3 +1,11 @@
+local bidirection_input = true;
+local encoder_input_dim = 512;
+local encoder_hidden_dim = 512;
+local decoder_embedding_dim = 512;
+local decoder_hidden_dim = if bidirection_input then encoder_hidden_dim * 2 else encoder_hidden_dim;
+local num_decoder_layers = 2;
+local num_encoder_layers = 2;
+local dropout_ratio = 0.3;
 {
   "dataset_reader": {
     "type": "lmpl_seq2seq",
@@ -11,35 +19,43 @@
       "tokens": {
         "namespace": "target_tokens"
       }
-    }
+    },
+    // "cache_directory": "data/iwslt/",
+    // "target_max_tokens": 25,
   },
-  "vocabulary": {
-    "max_vocab_size": { 
-        "source_tokens": 32009, 
-        "target": 22822
-    }
-  },
-  "train_data_path": "data/iwslt/train.de-en.tsv",
-  "validation_data_path": "data/iwslt/dev.de-en.tsv",
+  // "vocabulary": {
+  //   "max_vocab_size": { 
+  //       "source_tokens": 32009, 
+  //       "target": 22822
+  //   }
+  // },
+  "train_data_path": "data/iwslt/train.tsv",
+  "validation_data_path": "data/iwslt/valid.tsv",
+  "test_data_path": "data/iwslt/test.tsv",
+  "evaluate_on_test": true,
   "model": {
     "type": "lmpl_composed_lm",
     "use_in_seq2seq_mode": true,
     "decoder": {
         "type": "lmpl_auto_regressive_seq_decoder",
-        "max_decoding_steps": 50,
+        "max_decoding_steps": 75,
         "decoder_net": {
             "type": "lmpl_lstm_cell",
-            "decoding_dim": 512, 
-            "target_embedding_dim": 256,
+            "decoding_dim": decoder_hidden_dim, 
+            "target_embedding_dim": decoder_embedding_dim,
+            "bidirectional_input": bidirection_input,
+            "num_decoder_layers": num_decoder_layers,
+            "dropout": dropout_ratio,
             "attention": {
-                "type": "additive",
-                "vector_dim": 512,
-                "matrix_dim": 512
+                // "type": "additive",
+                // "vector_dim": decoder_hidden_dim,
+                // "matrix_dim": decoder_hidden_dim,
+                "type": "dot_product",
             },
         },
         "target_embedder": {
           "vocab_namespace": "target_tokens",
-          "embedding_dim": 256, 
+          "embedding_dim": decoder_embedding_dim, 
         },
         "loss_criterion": {
           "type": "mle",
@@ -48,25 +64,25 @@
         "target_namespace": "target_tokens",
         "beam_size": 1,
         "use_bleu" : true,
-        "dropout": 0.2,
+        "dropout": dropout_ratio,
     },
     "source_embedder": {
       "token_embedders": {
         "tokens": {
           "type": "embedding",
           "vocab_namespace": "source_tokens",
-          "embedding_dim": 256,
+          "embedding_dim": encoder_input_dim,
           "trainable": true
         }
       },
     },
     "encoder": {
       "type": "lstm",
-      "input_size": 256,
-      "hidden_size": 256,
-      "num_layers": 1,
-      "dropout": 0,
-      "bidirectional": true
+      "input_size": encoder_input_dim,
+      "hidden_size": encoder_hidden_dim,
+      "num_layers": num_encoder_layers,
+      "dropout": dropout_ratio,
+      "bidirectional": bidirection_input,
     },
     "initializer": {
       "regexes": [
@@ -76,7 +92,8 @@
         [".*weight_ih.*", {"type": "xavier_uniform"}],
         [".*weight_hh.*", {"type": "orthogonal"}],
         [".*bias_ih.*", {"type": "zero"}],
-        [".*bias_hh.*", {"type": "lstm_hidden_bias"}]
+        [".*bias_hh.*", {"type": "lstm_hidden_bias"}],
+        [".*attention.*", {"type": "zero"}],
       ],
     }
   },
@@ -84,17 +101,24 @@
     "batch_sampler": {
       "type": "bucket",
       "padding_noise": 0.0,
-      "batch_size": 48,
-    }
+      "batch_size": 36,
+      "sorting_keys": ["target_tokens", "source_tokens"],
+    },
+    "num_workers": 4,
+    "pin_memory": true,
   },
   "trainer": {
-    "num_epochs": 80,
+    "validation_metric": "+BLEU",
+    "num_epochs": 50,
     "patience": 10,
-    "opt_level": "O2",
+    // "use_amp": true,
+    // "opt_level": "O2",
     "cuda_device": 0,
+    "grad_norm": 0.1,
     "optimizer": {
-      "type": "adam",
-      "lr": 0.0001
+      "type": "sgd",
+      "lr": 0.5,
+      "momentum": 0.95
     },
     "learning_rate_scheduler": {
       "type": "exponential",
@@ -103,5 +127,11 @@
     "checkpointer": {
       "num_serialized_models_to_keep": 1,
     },
+    "epoch_callbacks": [{
+      "type": 'log_metrics_to_wandb',
+      "project_name": "lmpl_debug",
+      "run_name": "mle",
+      "sync_tensorboard": false,
+    },],
   }
 }

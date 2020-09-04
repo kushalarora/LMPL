@@ -2,6 +2,7 @@
 #SBATCH --ntasks=1
 #SBATCH --account=rrg-bengioy-ad
 #SBATCH --nodes=1
+#SBATCH  --cpus-per-task=4
 #SBATCH --mem=60000M
 #SBATCH --mail-type=ALL,TIME_LIMIT,BEGIN,END,FAIL
 #SBATCH --mail-user=arorakus@mila.quebec
@@ -12,5 +13,7 @@
 ###########################
 
 set -eux
+module load httpproxy
+module load cuda/10.2
 source ~/scratch/envs/lmpl/bin/activate 
 $@
