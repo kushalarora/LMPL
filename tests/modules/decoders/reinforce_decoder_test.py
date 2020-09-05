@@ -21,7 +21,6 @@ from lmpl.modules.decoders import LstmCellDecoderNet
 from lmpl.modules.decoders import LMPLReinforceDecoder
 from lmpl.modules.decoders.searnn_decoder import expand_tensor, \
                                                  rollout_mixing_functional, \
-                                                 get_contexts_to_rollout, \
                                                  get_neighbor_tokens, \
                                                  extend_targets_by_1
 

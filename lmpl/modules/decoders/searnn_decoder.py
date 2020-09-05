@@ -3,6 +3,7 @@ from overrides import overrides
 
 import torch
 import torch.nn.functional as F
+import sys
 
 import numpy as np
 import random
@@ -67,42 +68,23 @@ def reshape_decoder_hidden_and_context(state: Dict[str, torch.Tensor],
                                         step:int, num_tokens_to_rollout:int):
     # decoder_hidden_step: (batch_size, hidden_state_size)
     # decoder_context_step: (batch_size, hidden_state_size)
-    decoder_hidden_step = rollin_decoder_hiddens[:, step, :]
-    decoder_context_step = rollin_decoder_context[:, step, :]
+    decoder_hidden_step = rollin_decoder_hiddens
+    decoder_context_step = rollin_decoder_context
 
     # decoder_hidden_step_expanded: (batch_size *  num_tokens_to_rollout, 1, hidden_state_size)
     decoder_hidden_step_expanded = expand_tensor(decoder_hidden_step,
-                                                 num_tokens_to_rollout) \
-                                        .unsqueeze(1)
+                                                 num_tokens_to_rollout)
+
     # decoder_hidden_step_expanded: (batch_size *  num_tokens_to_rollout, 1, hidden_state_size)
     decoder_context_step_expanded = expand_tensor(decoder_context_step,
-                                                        num_tokens_to_rollout) \
-                                        .unsqueeze(1)
+                                                        num_tokens_to_rollout)
+
     # decoder_hidden: (batch_size * num_tokens_to_rollout, 1, hidden_state_size)
     # decoder_context: (batch_size *  num_tokens_to_rollout, 1, hidden_state_size)
-    state['decoder_hiddens'] = decoder_hidden_step_expanded
-    state['decoder_contexts'] = decoder_context_step_expanded
+    state['decoder_hidden'] = decoder_hidden_step_expanded
+    state['decoder_context'] = decoder_context_step_expanded
     return state
 
-def get_contexts_to_rollout(context_iterator:Iterable[int], 
-                            num_decoding_steps:int,
-                            rollout_ratio: float):
-    # TODO: #16 (@kushalarora) Simplify the context rollout computation logic.
-    rollout_contexts = []
-    all_rollouts = []
-    for i, step in enumerate(context_iterator):
-        all_rollouts.append(step)
-        # Always do rollout for first step and the last step. 
-        # Do not rollout for (1 - self._rollout_ratio) steps.
-        if i > 0 and step < num_decoding_steps and \
-                (random.random() < (1 - rollout_ratio)):
-            continue
-        rollout_contexts.append(step)
-
-    while len(rollout_contexts) < 2:
-        rollout_idx = random.randint(0, len(all_rollouts)-1)
-        rollout_contexts.append(all_rollouts[rollout_idx])
-    return rollout_contexts
 
 def get_neighbor_tokens(num_neighbors_to_add:int, 
                         num_decoding_steps:int, 
@@ -174,6 +156,9 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                  rollin_rollout_mixing_coeff: float = 0.25,
                  rollout_reference_policy:str = 'copy',
                  sort_next_tokens:bool = False,
+                 include_first: bool = False,
+                 include_last: bool = False,
+                 max_num_contexts: int = sys.maxsize,
                 ) -> None:
         super().__init__(
             vocab=vocab,
@@ -240,6 +225,46 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         self._rollout_reference_policy = rollout_reference_policy
 
         self._sort_next_tokens = sort_next_tokens
+
+        self._include_first = include_first
+        self._include_last = include_last
+        self._max_num_contexts = max_num_contexts
+
+    def get_contexts_to_rollout(self,
+                                context_iterator:Iterable[int], 
+                                num_decoding_steps:int,
+                                rollout_ratio: float):
+        # TODO: #16 (@kushalarora) Simplify the context rollout computation logic.
+        rollout_contexts = []
+        for i, step in enumerate(context_iterator):
+            # Always do rollout for first step and the last step. 
+           
+            if i == 0  and self._include_first or \
+               i == len(context_iterator) and self._include_last or \
+               random.random() < rollout_ratio:
+                rollout_contexts.append(step)          
+   
+        sorted_rollout_contexts = sorted(rollout_contexts)
+        if len(rollout_contexts) > self._max_num_contexts:
+            rollout_contexts = []
+            num_contexts = self._max_num_contexts
+
+            if self._include_first:
+                rollout_contexts.append(sorted_rollout_contexts[0])
+                sorted_rollout_contexts = sorted_rollout_contexts[1:]
+                num_contexts -= 1
+
+            if self._include_last:
+                rollout_contexts.append(sorted_rollout_contexts[-1])
+                sorted_rollout_contexts = sorted_rollout_contexts[:-1]
+                num_contexts -= 1
+
+            rollout_contexts += np.random.choice(sorted_rollout_contexts, 
+                                                num_contexts, 
+                                                replace=False).tolist()
+
+
+        return rollout_contexts
 
     def get_num_tokens_to_rollout(self):
         num_tokens_to_rollout = min(self._num_tokens_to_rollout, self._num_classes)
@@ -349,10 +374,11 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             # There might be a case where max_decoding_steps < num_decoding_steps, in this 
             # case we want to rollout beyond max_decoding_steps
             # TODO: #21 Add assertion to ensure rollout_steps is not negative.
-            rollout_steps = max(self._max_decoding_steps, num_decoding_steps)  + 1 - step
+            rollout_steps = min(self._max_decoding_steps, rollout_steps + 5)
         return rollout_steps
 
     def get_rollout_iterator(self, 
+                             rollout_contexts: List[int],
                              rollout_state: Dict[str, torch.Tensor],
                              rollin_logits: torch.FloatTensor,
                              rollin_predictions: torch.LongTensor,
@@ -364,13 +390,9 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                              ) -> Iterable[Dict[str, Union[torch.Tensor, int]]]:
         """ Get rollout iterator.
         """
-        context_iter=self._rollout_iter_function(num_decoding_steps)
-        rollout_contexts = get_contexts_to_rollout(rollout_ratio=self._rollout_ratio,
-                                                    num_decoding_steps=num_decoding_steps,
-                                                    context_iterator=context_iter)
         self._decoder_net._accumulate_hidden_states = False
 
-        for step in rollout_contexts:
+        for i, step in enumerate(rollout_contexts):
             searnn_next_step_tokens = self.get_next_tokens(
                                                 rollin_logits=rollin_logits, 
                                                 step=step, 
@@ -385,11 +407,10 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
 
             target_prefixes, target_tokens_truncated   = \
                     reshape_targets(targets, step, num_tokens_to_rollout)
-
             rollout_state = reshape_decoder_hidden_and_context(
                                     state=rollout_state, 
-                                    rollin_decoder_context=rollin_decoder_context,
-                                    rollin_decoder_hiddens=rollin_decoder_hiddens,
+                                    rollin_decoder_context=rollin_decoder_context[:, i],
+                                    rollin_decoder_hiddens=rollin_decoder_hiddens[:, i],
                                     step=step, 
                                     num_tokens_to_rollout=num_tokens_to_rollout)
 
@@ -438,7 +459,13 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         # TODO #14 (Kushal): During roll-in for SEARNN, only  accumulate/preserve states 
         # for which we need to do rollouts later.
         self._decoder_net._accumulate_hidden_states = True
-        
+
+        context_iter=self._rollout_iter_function(num_decoding_steps)
+        rollout_contexts = self.get_contexts_to_rollout(rollout_ratio=self._rollout_ratio,
+                                                    num_decoding_steps=num_decoding_steps,
+                                                    context_iterator=context_iter)
+        state['timesteps_to_accumulate'] = set(rollout_contexts)
+
         rollin_output_dict = self.rollin(state=state, 
                                          start_predictions=start_predictions,
                                          rollin_steps=num_decoding_steps,
@@ -446,8 +473,8 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
 
         # decoder_context: (batch_size, num_rollin_steps,  hidden_state_size)
         # decoder_hidden: (batch_size, num_rollin_steps, hidden_state_size)
-        rollin_decoder_context = state['decoder_contexts']
-        rollin_decoder_hiddens = state['decoder_hiddens']
+        rollin_decoder_context = state['decoder_accumulated_hiddens']
+        rollin_decoder_hiddens = state['decoder_accumulated_contexts']
 
         # rollin_logits: (batch_size, beam_size, num_rollin_steps, num_classes)
         # rollin_predictions: (batch_size, beam_size, num_rollin_steps)
@@ -476,6 +503,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         targets = extend_targets_by_1(targets)
 
         rollout_output_dict_iter = self.get_rollout_iterator(
+                                                rollout_contexts=rollout_contexts,
                                                 rollout_state=rollout_state,
                                                 rollin_logits=rollin_logits,
                                                 rollin_predictions=rollin_predictions,
