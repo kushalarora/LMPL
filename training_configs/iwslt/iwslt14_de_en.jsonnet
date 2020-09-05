@@ -21,7 +21,7 @@ local dropout_ratio = 0.3;
       }
     },
     // "cache_directory": "data/iwslt/",
-    // "target_max_tokens": 25,
+    "target_max_tokens": 50,
   },
   // "vocabulary": {
   //   "max_vocab_size": { 
@@ -38,7 +38,7 @@ local dropout_ratio = 0.3;
     "use_in_seq2seq_mode": true,
     "decoder": {
         "type": "lmpl_auto_regressive_seq_decoder",
-        "max_decoding_steps": 75,
+        "max_decoding_steps": 55,
         "decoder_net": {
             "type": "lmpl_lstm_cell",
             "decoding_dim": decoder_hidden_dim, 
@@ -121,8 +121,8 @@ local dropout_ratio = 0.3;
       "momentum": 0.95
     },
     "learning_rate_scheduler": {
-      "type": "exponential",
-      "gamma": 0.99
+      "type": "multi_step",
+      "milestones": [10, 20, 30, 40],
     },
     "checkpointer": {
       "num_serialized_models_to_keep": 1,

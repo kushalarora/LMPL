@@ -37,6 +37,7 @@ class LstmCellDecoderNet(DecoderNet):
         bidirectional_input: bool = False,
         num_decoder_layers: int = 1,
         accumulate_hidden_states: bool = False,
+        dropout: float = 0.2,
     ) -> None:
 
         super().__init__(
@@ -64,7 +65,10 @@ class LstmCellDecoderNet(DecoderNet):
 
         self._num_decoder_layers = num_decoder_layers
         if self._num_decoder_layers > 1:
-            self._decoder_cell = LSTM(decoder_input_dim, self.decoding_dim, self._num_decoder_layers)
+            self._decoder_cell = LSTM(input_size=decoder_input_dim, 
+                                        hidden_size=self.decoding_dim, 
+                                        num_layers=self._num_decoder_layers,
+                                        dropout=dropout,)
         else:
             # We'll use an LSTM cell as the recurrent cell that produces a hidden state
             # for the decoder at each time step.
@@ -86,7 +90,7 @@ class LstmCellDecoderNet(DecoderNet):
         # encoder_outputs_mask = encoder_outputs_mask
 
         # shape: (batch_size, max_input_sequence_length)
-        input_weights = self._attention(decoder_hidden_state, 
+        input_weights = self._attention(decoder_hidden_state[:, -1],    # Use last layer's output.
                                         encoder_outputs, 
                                         encoder_outputs_mask)
 
@@ -107,15 +111,17 @@ class LstmCellDecoderNet(DecoderNet):
             encoder_out["source_mask"],
             bidirectional=self._bidirectional_input,)
 
+        # shape: (batch_size, self._num_decoder_layers, decoder_output_dim)
+        decoder_hidden = final_encoder_output.view(batch_size, 1,  -1) \
+                                .expand(batch_size, self._num_decoder_layers, -1) \
+                                .contiguous()
         # shape: (batch_size, 1, decoder_output_dim)
-        decoder_hidden = final_encoder_output.unsqueeze(1)
-
-        # shape: (batch_size, 1, decoder_output_dim)
-        decoder_context = final_encoder_output.new_zeros(batch_size, self.decoding_dim).unsqueeze(1)
+        decoder_context = final_encoder_output.new_zeros(
+                                batch_size, self._num_decoder_layers, self.decoding_dim)
 
         return {
-            "decoder_hiddens": decoder_hidden,  
-            "decoder_contexts": decoder_context
+            "decoder_hidden": decoder_hidden,  
+            "decoder_context": decoder_context
         }
 
     @overrides
@@ -128,27 +134,25 @@ class LstmCellDecoderNet(DecoderNet):
                ) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
 
         # shape (decoder_hidden): (batch_size, 1, decoder_output_dim)
-        decoder_hiddens = previous_state.get("decoder_hiddens", None)
+        decoder_hidden = previous_state.get("decoder_hidden", None)
 
         # shape (decoder_context):  (batch_size, 1, decoder_output_dim)
-        decoder_contexts = previous_state.get("decoder_contexts", None)
-
-        decoder_hidden = decoder_hiddens[:,-1, :] if decoder_hiddens is not None else None
-
-        decoder_context = decoder_contexts[:, -1, :] if decoder_contexts is not None else None
+        decoder_context = previous_state.get("decoder_context", None)
 
         assert decoder_hidden is None and decoder_context is None or \
             decoder_hidden is not None and decoder_context is not None, \
         "Either decoder_hidden and context should be None or both should exist."
 
-        decoder_hidden_and_context = None \
-                                        if decoder_hidden is None or \
-                                           decoder_context is None else \
-                                     (decoder_hidden.transpose(0,1).contiguous(),
-                                      decoder_context.transpose(0,1).contiguous()) \
-                                         if self._num_decoder_layers > 1 else \
-                                     (decoder_hidden, decoder_context)
-
+        decoder_hidden_and_context = None
+        if decoder_hidden is not None and decoder_context is not None:
+            if self._num_decoder_layers > 1:                             
+                # This is needed because LSTM expects input to be
+                # num_layers * num_directions, batchsize, hidden_dim
+                # whereas everywhere else we expect batch size to be the first dimension of the tensor.
+                decoder_hidden_and_context = (decoder_hidden.transpose(0,1).contiguous(),
+                                                decoder_context.transpose(0,1).contiguous())  
+            else:
+                decoder_hidden_and_context = (decoder_hidden[:, -1], decoder_context[:, -1])
 
         # shape: (group_size, output_dim)
         last_predictions_embedding = previous_steps_predictions[:, -1]
@@ -160,6 +164,7 @@ class LstmCellDecoderNet(DecoderNet):
             # shape: (group_size, encoder_output_dim)
             attended_input = self._prepare_attended_input(decoder_hidden, encoder_outputs, source_mask)
 
+
             # shape: (group_size, decoder_output_dim + target_embedding_dim)
             decoder_input = torch.cat((attended_input, last_predictions_embedding), -1)
         else:
@@ -168,32 +173,49 @@ class LstmCellDecoderNet(DecoderNet):
 
         # shape (decoder_hidden): (batch_size, decoder_output_dim)
         # shape (decoder_context): (batch_size, decoder_output_dim)
-        if self._num_decoder_layers > 1:
-            _, (decoder_hidden, decoder_context) = self._decoder_cell(decoder_input.unsqueeze(0),
-                                                                      decoder_hidden_and_context)
-            decoder_output = decoder_hidden[-1]
-        else:
-            decoder_hidden, decoder_context = self._decoder_cell(decoder_input, 
-                                                                 decoder_hidden_and_context)
-            decoder_output = decoder_hidden
+        with torch.cuda.amp.autocast(False):
+            if self._num_decoder_layers > 1:
+                _, (decoder_hidden, decoder_context) = self._decoder_cell(decoder_input.unsqueeze(0),
+                                                                        decoder_hidden_and_context)
+                decoder_output = decoder_hidden[-1]
 
-        # TODO(Kushal:) Maybe this is not needed and so is line 141 changes.
-        if self._num_decoder_layers > 1:
-            decoder_hidden = decoder_hidden.transpose(0,1).contiguous()
-            decoder_context = decoder_context.transpose(0,1).contiguous()
-
-        decoder_hidden = decoder_hidden.unsqueeze(1)
-        decoder_context = decoder_context.unsqueeze(1)
-
-        if decoder_hiddens is None or not self._accumulate_hidden_states:
-            decoder_hiddens = decoder_hidden
-            decoder_contexts = decoder_context
-        elif self._accumulate_hidden_states:
-            decoder_hiddens = torch.cat([decoder_hiddens, decoder_hidden], dim=1)
-            decoder_contexts = torch.cat([decoder_contexts, decoder_context], dim=1)
+                # This is needed because LSTM expects input to be
+                # num_layers * num_directions, batchsize, hidden_dim
+                # whereas everywhere else we expect batch size to be the 
+                # first dimension of the tensor. Here, reverting batch_size as 
+                # the first dimension.
+                decoder_hidden = decoder_hidden.transpose(0,1).contiguous()
+                decoder_context = decoder_context.transpose(0,1).contiguous()
+            else:
+                decoder_hidden, decoder_context = self._decoder_cell(decoder_input, 
+                                                                    decoder_hidden_and_context)
+                decoder_output = decoder_hidden
+                # This is needed as LSTMCell returns (batch_size, hidden_dim) tensor. We unsqueeze 
+                # at 1 to indicate that there is only one layer.
+                decoder_hidden = decoder_hidden.unsqueeze(1)
+                decoder_context = decoder_context.unsqueeze(1)
+        decoder_hiddens = previous_state.get('decoder_accumulated_hiddens')
+        decoder_contexts = previous_state.get('decoder_accumulated_contexts')
+        if self._accumulate_hidden_states:
+            timestep = previous_state['timestep']
+            timesteps_to_accumulate = previous_state.get('timesteps_to_accumulate', set([]))
+            if timestep in timesteps_to_accumulate:
+                decoder_hidden_acc = decoder_hidden.unsqueeze(1)
+                decoder_context_acc = decoder_context.unsqueeze(1)
+                if decoder_hiddens is None:
+                    assert decoder_contexts is None
+                    decoder_hiddens = decoder_hidden_acc
+                    decoder_contexts = decoder_context_acc
+                else:
+                    assert decoder_contexts is not None
+                    decoder_hiddens = torch.cat([decoder_hiddens, decoder_hidden_acc], dim=1)
+                    decoder_contexts = torch.cat([decoder_contexts, decoder_context_acc], dim=1)
 
         return (
-            {"decoder_hiddens": decoder_hiddens, 
-             "decoder_contexts": decoder_contexts},
+            {"decoder_accumulated_hiddens": decoder_hiddens, 
+             "decoder_accumulated_contexts": decoder_contexts,
+             "decoder_hidden": decoder_hidden,
+             "decoder_context": decoder_context
+             },
             decoder_output,
         )

@@ -18,7 +18,7 @@ rl_config + {
           "type": "lmpl_reinforce_decoder",
           "generation_batch_size": 128,
           "loss_criterion": loss_criterion,
-          "rollout_ratio": 0.20,
+          "rollout_ratio": 0.10,
           "rollin_rollout_mixing_coeff": 0.5,
           "detach_rollin_logits": false,
         },
@@ -43,6 +43,9 @@ rl_config + {
         "grad_clipping": 1.0,
         "grad_norm": 100.0,
         "optimizer": {
+          // "type": "huggingface_adamw",
+          // "lr": 0.01,
+          // "momentum": 0.95,
           "type": "sgd",
           "lr": 0.5,
           "momentum": 0.95,
@@ -53,6 +56,9 @@ rl_config + {
           "run_name": "reinforce",
           "sync_tensorboard": false,
         },],
-        // "num_gradient_accumulation_steps": 0,
+        // "num_gradient_accumulation_steps": 4,
       },
+        // "distributed": {
+        //   "cuda_devices": [0, 1],
+        // }
     }

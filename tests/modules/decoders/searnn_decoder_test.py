@@ -21,7 +21,6 @@ from lmpl.modules.decoders import LstmCellDecoderNet
 from lmpl.modules.decoders import LMPLSEARNNDecoder
 from lmpl.modules.decoders.searnn_decoder import expand_tensor, \
                                                  rollout_mixing_functional, \
-                                                 get_contexts_to_rollout, \
                                                  get_neighbor_tokens, \
                                                  extend_targets_by_1
 
@@ -221,7 +220,7 @@ class TestSEARNNDecoder(ModelTestCase):
         rollout_steps = decoder.get_rollout_steps(
                                     num_decoding_steps=num_decoding_steps, 
                                     step=step)
-        assert rollout_steps ==  40 + 1 - step
+        assert rollout_steps ==  num_decoding_steps + 1 - step + 5
 
     @pytest.mark.skip(reason="not implemented")
     def test_get_rollout_iterator(self):

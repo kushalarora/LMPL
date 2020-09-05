@@ -450,8 +450,14 @@ class BaseRollinRolloutDecoder(SeqDecoder):
             for each source sentence in the batch.
         """
         input_choices = rollin_policy(timestep, last_predictions)
+
+        # State timestep which we might in _prepare_output_projections.
+        state['timestep'] = timestep
+
         # shape: (group_size, num_classes)
-        class_logits, state = self._prepare_output_projections(input_choices, state)
+        class_logits, state = self._prepare_output_projections(
+                                                last_predictions=input_choices,
+                                                state=state)
 
         if not self.training and self._mask_pad_and_oov:
             # This implementation is copied from masked_log_softmax from allennlp.nn.util.
