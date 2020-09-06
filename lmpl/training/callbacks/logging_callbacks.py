@@ -67,18 +67,14 @@ class LogMetricsToWandb(EpochCallback):
         # import wandb here to be sure that it was initialized
         # before this line was executed
         super().__init__()
-        import wandb  # type: ignore
-        run_id = datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
-        wandb.init(
-            project=project_name,
-            name=f'{run_name}/{run_id}',
-            sync_tensorboard=sync_tensorboard,
-            id=run_id,
-        )
+     
         self.config: Optional[Dict[str, Value]] = None
 
-        self.wandb = wandb
-        self.epoch_end_log_freq = 1
+        self.wandb = None
+        self.project_name = project_name
+        self.run_name = run_name
+        self.sync_tensorboard = sync_tensorboard
+        self.epoch_end_log_freq = epoch_end_log_freq
         self.current_batch_num = -1
         self.current_epoch_num = -1
         self.previous_logged_epoch = -1
@@ -102,8 +98,18 @@ class LogMetricsToWandb(EpochCallback):
         """ This should run after all the epoch end metrics have
         been computed by the metric_tracker callback.
         """
+        if self.wandb is None and is_master:
+            import wandb  # type: ignore
+            run_id = datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
+            wandb.init(
+                project=self.project_name,
+                name=f'{self.run_name}/{run_id}',
+                sync_tensorboard=self.sync_tensorboard,
+                id=run_id,
+            )
+            self.wandb = wandb
 
-        if self.config is None:
+        if self.config is None and is_master:
             self.update_config(trainer)
 
         self.current_epoch_num += 1
