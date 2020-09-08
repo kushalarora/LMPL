@@ -6,8 +6,7 @@ local decoder_hidden_dim = if bidirection_input then encoder_hidden_dim * 2 else
 local num_decoder_layers = 2;
 local num_encoder_layers = 2;
 local dropout_ratio = 0.3;
-{
-  "dataset_reader": {
+local dataset_reader = {
     "type": "lmpl_seq2seq",
     "source_token_indexers": {
       "tokens": {
@@ -22,6 +21,11 @@ local dropout_ratio = 0.3;
     },
     // "cache_directory": "data/iwslt/",
     "target_max_tokens": 50,
+  };
+{
+  "dataset_reader": {
+    "type": "sharded",
+    "base_reader": dataset_reader,
   },
   // "vocabulary": {
   //   "max_vocab_size": { 
@@ -29,10 +33,10 @@ local dropout_ratio = 0.3;
   //       "target": 22822
   //   }
   // },
-  "train_data_path": "data/iwslt/train.tsv",
-  "validation_data_path": "data/iwslt/valid.tsv",
-  "test_data_path": "data/iwslt/test.tsv",
-  "evaluate_on_test": true,
+  "train_data_path": "data/iwslt/train_*.tsv",
+  "validation_data_path": "data/iwslt/valid_*.tsv",
+  // "test_data_path": "data/iwslt/test.tsv",
+  // "evaluate_on_test": true,
   "model": {
     "type": "lmpl_composed_lm",
     "use_in_seq2seq_mode": true,
@@ -101,10 +105,10 @@ local dropout_ratio = 0.3;
     "batch_sampler": {
       "type": "bucket",
       "padding_noise": 0.0,
-      "batch_size": 36,
-      "sorting_keys": ["target_tokens", "source_tokens"],
+      "batch_size": 256,
+      "sorting_keys": ["target_tokens"],
     },
-    "num_workers": 4,
+    "num_workers": 1,
     "pin_memory": true,
   },
   "trainer": {
@@ -116,13 +120,15 @@ local dropout_ratio = 0.3;
     "cuda_device": 0,
     "grad_norm": 0.1,
     "optimizer": {
-      "type": "sgd",
-      "lr": 0.5,
-      "momentum": 0.95
+      "type": "adamax",
+      // "lr": 0.5,
+      // "momentum": 0.95
     },
     "learning_rate_scheduler": {
-      "type": "multi_step",
-      "milestones": [10, 20, 30, 40],
+      "type": "reduce_on_plateau",
+      "factor": 0.5,
+      "mode": "max",
+      "patience": 2
     },
     "checkpointer": {
       "num_serialized_models_to_keep": 1,
@@ -133,5 +139,5 @@ local dropout_ratio = 0.3;
       "run_name": "mle",
       "sync_tensorboard": false,
     },],
-  }
+  },
 }

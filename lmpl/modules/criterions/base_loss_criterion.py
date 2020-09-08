@@ -1,4 +1,4 @@
-from typing import Dict, List, Union, Iterable
+from typing import Dict, List, Union, Iterable, Tuple
 
 import torch 
 
@@ -46,13 +46,15 @@ class LossCriterion(Registrable):
                                                       loss combined.
     """
     output_dict = {}
-    loss_batch = self._compute_loss_batch(
-                            rollin_output_dict=rollin_output_dict, 
-                            rollout_output_dict_iter=rollout_output_dict_iter,
-                            state=state,
-                            target_tokens=target_tokens
-                          )
-
+    loss_output_dict = self._compute_loss_batch(
+                                  rollin_output_dict=rollin_output_dict,
+                                  rollout_output_dict_iter=rollout_output_dict_iter,
+                                  state=state,
+                                  target_tokens=target_tokens,
+                                )
+    output_dict.update(loss_output_dict)
+    loss_batch = loss_output_dict['loss_batch']
+    
     # This assumes target_mask was applied to loss
     # before loss_batch computation.
     if target_tokens:
@@ -78,6 +80,8 @@ class LossCriterion(Registrable):
     epoch: int = state['epoch']
     batch_number: int = state['batch_number']
 
+    output_dict = {}
+
     assert self._shall_compute_rollin_loss or \
             self._shall_compute_rollout_loss, \
             "We need to either compute rollin or rollout losses. Both" + \
@@ -87,22 +91,29 @@ class LossCriterion(Registrable):
     if epoch < self._warm_start_for_epochs or \
         batch_number < self._warm_start_for_batch_numbers or \
           self._shall_compute_rollin_loss:
-      rollin_loss_batch = self._compute_rollin_loss_batch(
-                                    rollin_output_dict=rollin_output_dict, 
-                                    state=state, 
-                                    target_tokens=target_tokens)
+        rollin_loss_batch = self._compute_rollin_loss_batch(
+                                      rollin_output_dict=rollin_output_dict, 
+                                      state=state, 
+                                      target_tokens=target_tokens)
+        output_dict['rollin_loss_batch'] = rollin_loss_batch
 
     if epoch < self._warm_start_for_epochs or \
         batch_number < self._warm_start_for_batch_numbers:
-        return rollin_loss_batch
+        output_dict['loss_batch'] = rollin_loss_batch
+        return output_dict
 
     rollout_loss_batch = 0
     if self._shall_compute_rollout_loss:
-        rollout_loss_batch = self._compute_rollout_loss_batch(
-                                      rollin_output_dict=rollin_output_dict, 
-                                      rollout_output_dict_iter=rollout_output_dict_iter,
-                                      state=state,
-                                      target_tokens=target_tokens)
+        rollout_loss_batch,  rollout_costs, rollout_steps =  \
+                  self._compute_rollout_loss_batch(
+                              rollin_output_dict=rollin_output_dict, 
+                              rollout_output_dict_iter=rollout_output_dict_iter,
+                              state=state,
+                              target_tokens=target_tokens)
+
+        output_dict['rollout_loss_batch'] = rollout_loss_batch
+        output_dict['rollout_costs'] = rollout_costs
+        output_dict['rollout_steps'] = rollout_steps
 
     assert self._rollin_rollout_mixing_coeff >= 0. and \
             self._rollin_rollout_mixing_coeff <= 1., \
@@ -116,13 +127,70 @@ class LossCriterion(Registrable):
       f"rollin_loss_batch: {rollin_loss_batch}," + \
         f"rollout_loss_batch: {rollout_loss_batch}"
 
-    return loss_batch
+    output_dict['loss_batch'] = loss_batch
+    return output_dict
 
   def _compute_rollout_loss_batch(self,
               rollin_output_dict: Dict[str, torch.Tensor],
               rollout_output_dict_iter: Iterable[Dict[str, Union[torch.Tensor, int]]],
               state: Dict[str, torch.Tensor],
               target_tokens: Dict[str, torch.Tensor] = None) -> torch.FloatTensor:
+    rollout_steps = []
+    losses = []
+    cost_functions = []
+    
+    for rollout_output_dict in rollout_output_dict_iter:
+        loss_batch, cost_batch, step = self._compute_rollout_loss_single_iter(
+                                                      rollin_output_dict=rollin_output_dict,
+                                                      rollout_output_dict=rollout_output_dict,
+                                                      state=state,
+                                                      target_tokens=target_tokens,
+                                                    )
+        losses.append(loss_batch)
+        cost_functions.append(cost_batch)
+        rollout_steps.append(step)
+
+    # rollout_steps: (num_rollout_steps,)
+    rollout_steps = torch.tensor(rollout_steps)
+
+    # cost_functions: (batch_size, num_rollout_steps)
+    cost_functions = torch.stack(cost_functions, dim=1)
+
+    # rl_losses: (batch_size, num_rollout_steps)
+    losses = torch.stack(losses, dim=1)
+
+    # TODO: #54 Figure out if we need this target_mask based normalization? 
+    # # Similarly, only update logits (or not mask logits) for steps
+    # # we rollout out for,
+    # target_masks = util.get_text_field_mask(target_tokens)
+    
+    # # target_masks: (batch_size, num_rollout_steps)
+    # target_masks = target_masks[:, rollout_steps]
+
+    # non_batch_dims = tuple(range(1, len(target_masks.shape)))
+
+    # # loss_batch: (batch_size,)
+    # loss_batch_unnormalized = (losses * target_masks).sum(dim=non_batch_dims)
+
+    # # Generate denominator for normalizing loss across batch.
+    # # Ideally this will be equal to batch_size, but this is a
+    # # safer way to do this. Here, we ignore sequences with all
+    # # pad tokens.
+
+    # # shape : (batch_size,)
+    # target_mask_sum = target_masks.sum(dim=non_batch_dims) + 1e-45
+
+    # loss_batch = loss_batch_unnormalized/target_mask_sum
+    loss_batch = losses.mean(dim=-1)
+    
+    return loss_batch, cost_functions, rollout_steps
+
+  def _compute_rollout_loss_single_iter(self, 
+                        rollin_output_dict: Dict[str, torch.Tensor],
+                        rollout_output_dict: Dict[str, Union[torch.Tensor, int]], 
+                        state: Dict[str, torch.Tensor],
+                        target_tokens: Dict[str, torch.Tensor] = None,
+                ) -> Tuple[torch.FloatTensor, torch.FloatTensor, int]:
     raise NotImplementedError()
 
   def _compute_rollin_loss_batch(self, 
@@ -163,7 +231,7 @@ class LossCriterion(Registrable):
                                 mask=target_masks)
     
     if 'logits' in rollout_output_dict:
-      cost_batch = cost_batch.to(rollout_output_dict['logits'].dtype)\
+      cost_batch = cost_batch.to(rollout_output_dict['logits'].dtype) \
                               .to(rollout_output_dict['logits'].device)
 
     return cost_batch

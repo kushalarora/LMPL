@@ -1,4 +1,4 @@
-from typing import Dict, List, Iterable, Union
+from typing import Dict, List, Iterable, Union, Tuple
 from overrides import overrides
 
 
@@ -17,9 +17,11 @@ class ReinforceCriterion(LossCriterion):
           rollin_rollout_mixing_coeff:float = 0.,
           labeling_smooting_ratio: float = None,
           temperature: float = 1, 
-          detach_rollin_logits: bool = True,
+          detach_rollin_logits: bool = False,
           warm_start_for_epochs: int = -1, 
           warm_start_for_batch_numbers: int = -1,
+          normalize_costs: bool = False,
+          entropy_regularization_coeff: bool = 0,
         ):
     super().__init__(
                 rollout_cost_function=rollout_cost_function,
@@ -32,36 +34,26 @@ class ReinforceCriterion(LossCriterion):
               )
     
     self._temperature = temperature
-    self._loss = torch.nn.KLDivLoss(reduction='none')
     self._detach_rollin_logits = detach_rollin_logits
+    self._normalize_costs = normalize_costs
+    self._entropy_regularization_coeff = entropy_regularization_coeff
 
   @overrides
-  def _compute_rollout_loss_batch(self,
-              rollin_output_dict: Dict[str, torch.Tensor],
-              rollout_output_dict_iter: Iterable[Dict[str, Union[torch.Tensor, int]]],
-              state: Dict[str, torch.Tensor],
-              target_tokens: Dict[str, torch.Tensor] = None) -> torch.FloatTensor:
+  def _compute_rollout_loss_single_iter(self,
+                  rollin_output_dict: Dict[str, torch.Tensor],
+                  rollout_output_dict: Dict[str, Union[torch.Tensor, int]],
+                  state: Dict[str, torch.Tensor],
+                  target_tokens: Dict[str, torch.Tensor] = None,
+              ) -> Tuple[torch.FloatTensor, torch.FloatTensor, int]:
 
-    rollout_steps = []
-    rl_losses = []
-    cost_functions = []
+      # rollin_logits: (batch_size, num_rollin_steps, num_classes)
+      # rollin_predictions: (batch_size, num_rollin_steps)
+      rollin_logits: torch.FloatTensor = rollin_output_dict['logits'].squeeze(1)
+      rollin_predictions: torch.LongTensor = rollin_output_dict['predictions'].squeeze(1)
 
-    # rollin_logits: (batch_size, num_rollin_steps, num_classes)
-    # rollin_predictions: (batch_size, num_rollin_steps)
-    rollin_logits: torch.FloatTensor = rollin_output_dict['logits'].squeeze(1)
-    batch_size, num_rollin_steps, num_classes = rollin_logits.shape
+      if self._detach_rollin_logits:
+          rollin_output_dict['logits'].detach_()
 
-    if self._detach_rollin_logits:
-      rollin_logits = rollin_logits.detach()
-
-    rollin_predictions: torch.LongTensor = rollin_output_dict['predictions'].squeeze(1)
-
-    for rollout_output_dict in rollout_output_dict_iter:
-      # For whole batch we rollout only these contexts.  
-      # By default this will be for all, but in certain cases of
-      # filtering, we might only consider a select few.
-      # rollout_contexts: (num_rollout_contexts,)
-      
       step: int = rollout_output_dict['step']
 
       # cost_batch: (batch_size )
@@ -81,24 +73,19 @@ class ReinforceCriterion(LossCriterion):
       rollout_logits: torch.FloatTensor = rollout_output_dict['logits'].squeeze(1)
 
       # rollout_logits: (batch_size, num_decoding_steps - 1, num_classes)
-      rollin_rollout_logits = torch.cat([rollin_logits_prefix, 
-                                         rollout_logits],
-                                        dim=1)
+      rollin_rollout_logits: torch.FloatTensor = torch.cat([rollin_logits_prefix, 
+                                                            rollout_logits],
+                                                          dim=1)
 
-      # rollout_reward_batch : (batch_size,)
-      rollout_reward_batch = -1 * cost_batch
-
-      # rewards = rollout_reward_batch.detach()
-      # rewards = F.softmax(rewards * self._temperature, dim=1) 
-      rewards = torch.exp(rollout_reward_batch.detach()) 
-      # rewards = (rewards - rewards.min())/(rewards.max() - rewards.min())
+      
+      if self._normalize_costs:
+        cost_batch = (cost_batch - cost_batch.min())/(cost_batch.max() - cost_batch.min())
   
       # predictions: (batch_size, num_decoding_steps)
       top_predictions = rollout_output_dict["predictions"][:, 0, :]
       
       # rollout_logits: (batch_size, num_decoding_steps - 1, num_classes)
-      rollin_rollout_logits = F.log_softmax(rollin_rollout_logits,
-                                      dim=-1)
+      rollin_rollout_logits = F.log_softmax(rollin_rollout_logits, dim=-1)
 
       # rollout_logits: (batch_size, num_decoding_steps - 1)
       log_probs = torch.gather(rollin_rollout_logits, -1,
@@ -110,43 +97,29 @@ class ReinforceCriterion(LossCriterion):
       # and masks out everything after this.
       log_prob_mask = rollout_output_dict['prediction_masks'][:, 0, 1:]
       log_probs *= log_prob_mask
-
-      # We are trying to maximize the reward, hence minimizing the log prob * reward.
-      summed_reward_log_probs = (-1 * log_probs * rewards.unsqueeze(1)).sum(dim=-1)
       num_tokens_per_seq = log_prob_mask.sum(dim=-1)
+      normalize_log_probs = log_probs.sum(dim=-1)/num_tokens_per_seq
+      # We are trying to maximize the reward, hence minimizing the log prob * reward.
+      rl_loss_batch =  -1 * normalize_log_probs * (1 - cost_batch)
 
-      rl_loss_batch = (summed_reward_log_probs/num_tokens_per_seq)
+      # Add entropy regularization coefficient
+      if self._entropy_regularization_coeff > 0:
+        rl_loss_batch += -1 * self._entropy_regularization_coeff * \
+                              self._compute_entropy_regularization_term(
+                                                        logits=rollin_rollout_logits, 
+                                                        mask=log_prob_mask,
+                                                      )
+      return rl_loss_batch, cost_batch, step
 
-      rl_losses.append(rl_loss_batch)
-      rollout_steps.append(step)
-      cost_functions.append(cost_batch)
 
-    # rollout_steps: (num_rollout_steps,)
-    rollout_steps = torch.tensor(rollout_steps)
 
-    # rl_losses: (batch_size, num_rollout_steps)
-    rl_losses = torch.stack(rl_losses, dim=1)
-
-    # Similarly, only update logits (or not mask logits) for steps
-    # we rollout out for,
-    target_masks = util.get_text_field_mask(target_tokens)
-    
-    # target_masks: (batch_size, num_rollout_steps)
-    target_masks = target_masks[:, rollout_steps]
-
-    non_batch_dims = tuple(range(1, len(target_masks.shape)))
-
-    # rl_loss_batch: (batch_size,)
-    rl_loss_batch_unnormalized = (rl_losses * target_masks).sum(dim=non_batch_dims)
-
-    # Generate denominator for normalizing loss across batch.
-    # Ideally this will be equal to batch_size, but this is a
-    # safer way to do this. Here, we ignore sequences with all
-    # pad tokens.
-
-    # shape : (batch_size,)
-    target_mask_sum = target_masks.sum(dim=non_batch_dims)
-
-    rl_loss_batch = rl_loss_batch_unnormalized/target_mask_sum
-
-    return rl_loss_batch
+  def _compute_entropy_regularization_term(self,
+                                          logits: torch.FloatTensor, 
+                                          mask: torch.LongTensor):
+      # entropy_seq: (batch_size, num_decoding_steps - 1)
+      entropy_seq =  -1 * (F.softmax(logits, dim=-1) * logits).sum(dim=-1)
+      entropy_seq *= mask
+      num_tokens_per_seq = mask.sum(dim=-1)
+      # normalize_entropy: (batch_size, )
+      normalized_entropy = entropy_seq.sum(dim=-1)/num_tokens_per_seq
+      return normalized_entropy
