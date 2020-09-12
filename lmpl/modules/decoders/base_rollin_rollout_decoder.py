@@ -222,7 +222,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
         self._tensor_based_metric = tensor_based_metric
         self._token_based_metric = token_based_metric
         self._tensor_based_metric_mask = tensor_based_metric_mask
-
+        
     def get_output_dim(self):
         return self._decoder_net.get_output_dim()
 
