@@ -59,7 +59,8 @@ class KLLossCriterion(LossCriterion):
       next_tokens_flattened: torch.LongTensor = rollout_output_dict['next_tokens']
 
       # next_tokens: (batch_size, num_tokens_to_rollout)
-      next_tokens: torch.LongTensor = next_tokens.reshape(batch_size, num_tokens_to_rollout)
+      next_tokens: torch.LongTensor = next_tokens_flattened \
+                                          .reshape(batch_size, num_tokens_to_rollout)
 
       # cost_batch: (batch_size, num_tokens_to_rollout,)
       cost_batch: torch.FloatTensor = cost_batch_flattened \
