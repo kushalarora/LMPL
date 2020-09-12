@@ -6,6 +6,7 @@ local loss_criterion = {
           "type": "reinforce",
           "temperature": 1,
           "rollout_cost_function": rollout_cost_function,
+          "detach_rollin_logits": false,
       };
 
 rl_config + {
@@ -20,7 +21,6 @@ rl_config + {
           "loss_criterion": loss_criterion,
           "rollout_ratio": 0.10,
           "rollin_rollout_mixing_coeff": 0.5,
-          "detach_rollin_logits": false,
         },
         // "initializer": {
         //   "regexes": [
@@ -35,20 +35,20 @@ rl_config + {
       },
       "data_loader"+: {
         "batch_sampler"+: {
-          "batch_size": 36,
+          "batch_size": 32,
         },
       },
       "trainer"+: {
-        "num_epochs": 50,
-        "grad_clipping": 1.0,
+        "num_epochs": 80,
+        "grad_clipping": 5.0,
         "grad_norm": 100.0,
         "optimizer": {
-          // "type": "huggingface_adamw",
+          "type": "adamax",
           // "lr": 0.01,
           // "momentum": 0.95,
-          "type": "sgd",
-          "lr": 0.5,
-          "momentum": 0.95,
+          // "type": "sgd",
+          // "lr": 0.50,
+          // "momentum": 0.95,
         },
         "epoch_callbacks": [{
           "type": 'log_metrics_to_wandb',
@@ -58,7 +58,7 @@ rl_config + {
         },],
         // "num_gradient_accumulation_steps": 4,
       },
-        // "distributed": {
-        //   "cuda_devices": [0, 1],
-        // }
+      "distributed": {
+        "cuda_devices": [0, 1, 2, 3],
+      },
     }

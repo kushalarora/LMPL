@@ -66,7 +66,7 @@ class TestBaseLossCriterion(AllenNlpTestCase):
                     rollin_rollout_mixing_coeff=0.)
 
     criterion._compute_rollout_loss_batch = \
-      lambda rollin_output_dict,rollout_output_dict_iter,state,target_tokens: torch.FloatTensor([1.,3.])
+      lambda rollin_output_dict,rollout_output_dict_iter,state,target_tokens: (torch.FloatTensor([1.,3.]), torch.FloatTensor([1.,3.]), [1,2])
 
     target_tokens = {'tokens':
       {'tokens': torch.LongTensor([[1,2,3,4],
@@ -105,7 +105,7 @@ class TestBaseLossCriterion(AllenNlpTestCase):
     criterion._compute_rollin_loss_batch = \
       lambda rollin_output_dict,state,target_tokens: torch.FloatTensor([1.,3.])
     criterion._compute_rollout_loss_batch = \
-      lambda rollin_output_dict,rollout_output_dict_iter,state,target_tokens: torch.FloatTensor([1.,3.])
+      lambda rollin_output_dict,rollout_output_dict_iter,state,target_tokens: (torch.FloatTensor([1.,3.]), torch.FloatTensor([1.,3.]), [1,2])
 
     with pytest.raises(AssertionError):
       output_dict = criterion(rollin_dict, rollout_dict, 
@@ -118,7 +118,7 @@ class TestBaseLossCriterion(AllenNlpTestCase):
     criterion._compute_rollin_loss_batch = \
       lambda rollin_output_dict,state,target_tokens: torch.FloatTensor([1.,3.])
     criterion._compute_rollout_loss_batch = \
-      lambda rollin_output_dict,rollout_output_dict_iter,state,target_tokens: torch.FloatTensor([1.,3.])
+      lambda rollin_output_dict,rollout_output_dict_iter,state,target_tokens: (torch.FloatTensor([1.,3.]), torch.FloatTensor([1.,3.]), [1,2])
 
     with pytest.raises(AssertionError):
       output_dict = criterion(rollin_dict, rollout_dict, 
@@ -132,7 +132,7 @@ class TestBaseLossCriterion(AllenNlpTestCase):
     criterion._compute_rollin_loss_batch = \
       lambda rollin_output_dict,state,target_tokens: torch.FloatTensor([1.,1.])
     criterion._compute_rollout_loss_batch = \
-      lambda rollin_output_dict,rollout_output_dict_iter,state,target_tokens: torch.FloatTensor([2.,2.])
+      lambda rollin_output_dict,rollout_output_dict_iter,state,target_tokens: (torch.FloatTensor([2.,2.]), torch.FloatTensor([1.,3.]), [1,2])
       
     output_dict = criterion(rollin_dict, rollout_dict, 
                                     state, target_tokens)
@@ -214,7 +214,7 @@ class TestBaseLossCriterion(AllenNlpTestCase):
     
     criterion._compute_rollout_loss_batch = \
       lambda rollin_output_dict,rollout_output_dict_iter,state,target_tokens: \
-                                                          torch.FloatTensor([0., 2.])
+                                                        (torch.FloatTensor([0., 2.]), torch.FloatTensor([1.,3.]), [1,2])
     target_tokens = {'tokens':
       {'tokens': torch.LongTensor([[1,2,3,4],
                                     [5,6,7,8]])}}
@@ -254,7 +254,7 @@ class TestBaseLossCriterion(AllenNlpTestCase):
     
     criterion._compute_rollout_loss_batch = \
       lambda rollin_output_dict,rollout_output_dict_iter,state,target_tokens: \
-                                                          torch.FloatTensor([0., 2.])
+                                                          (torch.FloatTensor([0., 2.]), torch.FloatTensor([1.,3.]), [1,2])
     target_tokens = {'tokens':
       {'tokens': torch.LongTensor([[1,2,3,4],
                                     [5,6,7,8]])}}

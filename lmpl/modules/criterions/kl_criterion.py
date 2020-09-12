@@ -1,4 +1,4 @@
-from typing import Dict, List, Iterable, Union
+from typing import Dict, List, Iterable, Union, Tuple
 from overrides import overrides
 
 
@@ -33,30 +33,21 @@ class KLLossCriterion(LossCriterion):
     self._loss = torch.nn.KLDivLoss(reduction='none')
 
   @overrides
-  def _compute_rollout_loss_batch(self,
-              rollin_output_dict: Dict[str, torch.Tensor],
-              rollout_output_dict_iter: Iterable[Dict[str, Union[torch.Tensor, int]]],
-              state: Dict[str, torch.Tensor],
-              target_tokens: Dict[str, torch.Tensor] = None) -> torch.FloatTensor:
+  def _compute_rollout_loss_single_iter(self,
+                  rollin_output_dict: Dict[str, torch.Tensor],
+                  rollout_output_dict: Dict[str, Union[torch.Tensor, int]],
+                  state: Dict[str, torch.Tensor],
+                  target_tokens: Dict[str, torch.Tensor] = None,
+              ) -> Tuple[torch.FloatTensor, torch.FloatTensor, int]:
+      # rollin_logits: (batch_size, num_rollin_steps, num_classes)
+      # rollin_predictions: (batch_size, num_rollin_steps)
+      rollin_logits: torch.FloatTensor = rollin_output_dict['logits'].squeeze(1)
+      rollin_predictions: torch.LongTensor = rollin_output_dict['predictions'].squeeze(1)
 
-    # rollin_logits: (batch_size, num_rollin_steps, num_classes)
-    # rollin_predictions: (batch_size, num_rollin_steps)
-    rollin_logits: torch.FloatTensor = rollin_output_dict['logits'].squeeze(1)
-    rollin_predictions: torch.LongTensor = rollin_output_dict['predictions'].squeeze(1)
+      batch_size, num_rollin_steps, num_classes = rollin_logits.shape
 
-    rollout_steps = []
-    kl_losses = []
-    kl_cost_function = []
-    batch_size, num_rollin_steps, num_classes = rollin_logits.shape
-
-    for rollout_output_dict in rollout_output_dict_iter:
-      # For whole batch we rollout only these contexts.  
-      # By default this will be for all, but in certain cases of
-      # filtering, we might only consider a select few.
-      # rollout_contexts: (num_rollout_contexts,)
-      
-      # cost_batch: (batch_size * num_tokens_to_rollout,)
-      cost_batch = self._compute_rollout_cost(
+      # cost_batch_flattened: (batch_size * num_tokens_to_rollout,)
+      cost_batch_flattened: torch.FloatTensor = self._compute_rollout_cost(
                                         rollout_output_dict=rollout_output_dict, 
                                     )
       
@@ -64,12 +55,16 @@ class KLLossCriterion(LossCriterion):
       step: int = rollout_output_dict['step']
       num_tokens_to_rollout: int = rollout_output_dict['num_tokens_to_rollout']
 
+      # next_tokens_flattened: (batch_size * num_tokens_to_rollout,)
+      next_tokens_flattened: torch.LongTensor = rollout_output_dict['next_tokens']
+
       # next_tokens: (batch_size, num_tokens_to_rollout)
-      next_tokens: torch.LongTensor = rollout_output_dict['next_tokens']
-      next_tokens = next_tokens.reshape(batch_size, num_tokens_to_rollout)
+      next_tokens: torch.LongTensor = next_tokens_flattened \
+                                          .reshape(batch_size, num_tokens_to_rollout)
 
       # cost_batch: (batch_size, num_tokens_to_rollout,)
-      cost_batch = cost_batch.reshape(batch_size, num_tokens_to_rollout)
+      cost_batch: torch.FloatTensor = cost_batch_flattened \
+                                          .reshape(batch_size, num_tokens_to_rollout)
 
       # Only consider those logits which you did rollout for.
       # step_logits: (batch_size, num_classes)
@@ -82,9 +77,10 @@ class KLLossCriterion(LossCriterion):
       step_logits = F.log_softmax(step_logits, dim=-1)
 
       # scattered_logits: (batch_size,  num_tokens_to_rollout)
-      scattered_logits = torch.gather(input=step_logits, 
-                                        dim=-1, 
-                                        index=next_tokens)
+      scattered_logits: torch.FloatTensor = torch.gather(
+                                                  input=step_logits, 
+                                                  dim=-1, 
+                                                  index=next_tokens)
 
       # x: (batch_size, num_tokens_to_rollout)
       x = scattered_logits # F.log_softmax(scattered_logits, dim=-1)
@@ -95,36 +91,4 @@ class KLLossCriterion(LossCriterion):
       # kl_losses: (batch_size,)
       kl_loss = self._loss(x, y).sum(dim=-1)
       
-      kl_losses.append(kl_loss)
-      rollout_steps.append(step)
-      kl_cost_function.append(cost_batch)
-
-    # rollout_steps: (num_rollout_steps,)
-    rollout_steps = torch.tensor(rollout_steps)
-
-    # kl_losses: (batch_size, num_rollout_steps)
-    kl_losses = torch.stack(kl_losses, dim=1)
-
-    # Similarly, only update logits (or not mask logits) for steps
-    # we rollout out for,
-    target_masks = util.get_text_field_mask(target_tokens)
-    
-    # target_masks: (batch_size, num_rollout_steps)
-    target_masks = target_masks[:, rollout_steps]
-
-    non_batch_dims = tuple(range(1, len(target_masks.shape)))
-
-    # kl_loss_batch: (batch_size,)
-    kl_loss_batch_unnormalized = (kl_losses * target_masks).sum(dim=non_batch_dims)
-
-    # Generate denominator for normalizing loss across batch.
-    # Ideally this will be equal to batch_size, but this is a
-    # safer way to do this. Here, we ignore sequences with all
-    # pad tokens.
-
-    # shape : (batch_size,)
-    target_mask_sum = target_masks.sum(dim=non_batch_dims)
-
-    kl_loss_batch = kl_loss_batch_unnormalized/target_mask_sum
-
-    return kl_loss_batch
+      return kl_loss, cost_batch, step
