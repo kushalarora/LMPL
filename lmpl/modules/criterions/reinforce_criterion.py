@@ -22,6 +22,7 @@ class ReinforceCriterion(LossCriterion):
           warm_start_for_batch_numbers: int = -1,
           normalize_costs: bool = False,
           entropy_regularization_coeff: bool = 0,
+          alpha: float = 1.0,
         ):
     super().__init__(
                 rollout_cost_function=rollout_cost_function,
@@ -37,6 +38,8 @@ class ReinforceCriterion(LossCriterion):
     self._detach_rollin_logits = detach_rollin_logits
     self._normalize_costs = normalize_costs
     self._entropy_regularization_coeff = entropy_regularization_coeff
+    assert alpha > 0 and alpha <= 1., "alpha should be in the range (0, 1]."
+    self._alpha = alpha
 
   @overrides
   def _compute_rollout_loss_single_iter(self,
@@ -100,7 +103,7 @@ class ReinforceCriterion(LossCriterion):
       num_tokens_per_seq = log_prob_mask.sum(dim=-1)
       normalize_log_probs = log_probs.sum(dim=-1)/num_tokens_per_seq
       # We are trying to maximize the reward, hence minimizing the log prob * reward.
-      rl_loss_batch =  -1 * normalize_log_probs * (1 - cost_batch)
+      rl_loss_batch =  -1 * (self._alpha**step) * normalize_log_probs * (1 - cost_batch)
 
       # Add entropy regularization coefficient
       if self._entropy_regularization_coeff > 0:

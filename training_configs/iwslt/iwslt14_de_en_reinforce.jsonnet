@@ -7,6 +7,7 @@ local loss_criterion = {
           "temperature": 1,
           "rollout_cost_function": rollout_cost_function,
           "detach_rollin_logits": false,
+          "alpha": 0.99,
       };
 
 rl_config + {
@@ -58,7 +59,7 @@ rl_config + {
         },],
         // "num_gradient_accumulation_steps": 4,
       },
-      "distributed": {
-        "cuda_devices": [0, 1, 2, 3],
-      },
+      // "distributed": {
+      //   "cuda_devices": [0, 1, 2, 3],
+      // },
     }

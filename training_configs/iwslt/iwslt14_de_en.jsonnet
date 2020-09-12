@@ -113,16 +113,17 @@ local dataset_reader = {
   },
   "trainer": {
     "validation_metric": "+BLEU",
-    "num_epochs": 50,
+    "num_epochs": 80,
     "patience": 10,
     // "use_amp": true,
     // "opt_level": "O2",
     "cuda_device": 0,
-    "grad_norm": 0.1,
+    "grad_clipping": 5.0,
     "optimizer": {
-      "type": "adamax",
-      // "lr": 0.5,
-      // "momentum": 0.95
+      // "type": "adamax",
+      "type": "sgd",
+      "lr": 0.25,
+      "momentum": 0.95
     },
     "learning_rate_scheduler": {
       "type": "reduce_on_plateau",
@@ -140,4 +141,7 @@ local dataset_reader = {
       "sync_tensorboard": false,
     },],
   },
+  // "distributed": {
+  //   "cuda_devices": [0, 1, 2, 3],
+  // },
 }
