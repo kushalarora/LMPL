@@ -249,10 +249,11 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         
         num_rollout_contexts = len(rollout_contexts)
         if num_rollout_contexts < self._min_num_contexts:
-            num_rollout_contexts = max(self._min_num_contexts, rollout_ratio * context_iterator_len)
+            num_rollout_contexts = max(self._min_num_contexts,
+                                        int(rollout_ratio * context_iterator_len))
             rollout_contexts += np.random.choice(list(context_iterator), 
                                                     num_rollout_contexts, 
-                                                    replace=False)
+                                                    replace=False).tolist()
 
         elif num_rollout_contexts > self._max_num_contexts:
             sorted_rollout_contexts = sorted(rollout_contexts)
