@@ -229,6 +229,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         self._include_first = include_first
         self._include_last = include_last
         self._max_num_contexts = max_num_contexts
+        self._min_num_contexts = 2
 
     def get_contexts_to_rollout(self,
                                 context_iterator:Iterable[int], 
@@ -236,16 +237,25 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                                 rollout_ratio: float):
         # TODO: #16 (@kushalarora) Simplify the context rollout computation logic.
         rollout_contexts = []
+        context_iterator_len =  len(context_iterator)
         for i, step in enumerate(context_iterator):
             # Always do rollout for first step and the last step. 
            
             if i == 0  and self._include_first or \
-               i == len(context_iterator) and self._include_last or \
+               i == context_iterator_len and self._include_last or \
                random.random() < rollout_ratio:
                 rollout_contexts.append(step)          
    
-        sorted_rollout_contexts = sorted(rollout_contexts)
-        if len(rollout_contexts) > self._max_num_contexts:
+        
+        num_rollout_contexts = len(rollout_contexts)
+        if num_rollout_contexts < self._min_num_contexts:
+            num_rollout_contexts = max(self._min_num_contexts, rollout_ratio * context_iterator_len)
+            rolout_contexts += np.random.choice(list(context_iterator), 
+                                                    num_rollout_contexts, 
+                                                    replace=False)
+
+        elif num_rollout_contexts > self._max_num_contexts:
+            sorted_rollout_contexts = sorted(rollout_contexts)
             rollout_contexts = []
             num_contexts = self._max_num_contexts
 
