@@ -159,6 +159,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                  include_first: bool = False,
                  include_last: bool = False,
                  max_num_contexts: int = sys.maxsize,
+                 min_num_contexts: int = 2,
                 ) -> None:
         super().__init__(
             vocab=vocab,
@@ -229,7 +230,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         self._include_first = include_first
         self._include_last = include_last
         self._max_num_contexts = max_num_contexts
-        self._min_num_contexts = 2
+        self._min_num_contexts = min_num_contexts
 
     def get_contexts_to_rollout(self,
                                 context_iterator:Iterable[int], 

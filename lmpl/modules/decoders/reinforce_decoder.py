@@ -65,6 +65,8 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
                  rollout_ratio: float = 1.0,
                  detach_rollin_logits: bool = True,
                  max_num_contexts: int = 10,
+                include_first: bool = True,
+                include_last: bool = False,
             ) -> None:
 
         super().__init__(
@@ -115,8 +117,9 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
             rollout_ratio=rollout_ratio,
             detach_rollin_logits=detach_rollin_logits,
             rollin_rollout_mixing_coeff=rollin_rollout_mixing_coeff,
-            include_first=True,
-            include_last=True,
+            include_first=include_first,
+            include_last=include_last,
             max_num_contexts=max_num_contexts,
+            min_num_contexts=1,
     )
 
