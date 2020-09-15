@@ -95,6 +95,7 @@ class LossCriterion(Registrable):
                                       rollin_output_dict=rollin_output_dict, 
                                       state=state, 
                                       target_tokens=target_tokens)
+
         output_dict['rollin_loss_batch'] = rollin_loss_batch
 
     if epoch < self._warm_start_for_epochs or \
@@ -104,7 +105,7 @@ class LossCriterion(Registrable):
 
     rollout_loss_batch = 0
     if self._shall_compute_rollout_loss:
-        rollout_loss_batch,  rollout_costs, rollout_steps =  \
+        rollout_loss_batch,  rollout_costs, rollout_steps, rollout_losses =  \
                   self._compute_rollout_loss_batch(
                               rollin_output_dict=rollin_output_dict, 
                               rollout_output_dict_iter=rollout_output_dict_iter,
@@ -114,7 +115,8 @@ class LossCriterion(Registrable):
         output_dict['rollout_loss_batch'] = rollout_loss_batch
         output_dict['rollout_costs'] = rollout_costs
         output_dict['rollout_steps'] = rollout_steps
-
+        output_dict['rollout_losses'] = rollout_losses
+        
     assert self._rollin_rollout_mixing_coeff >= 0. and \
             self._rollin_rollout_mixing_coeff <= 1., \
               "rollin_rollout_mixing_coeff must be between [0, 1]." + \
@@ -162,28 +164,28 @@ class LossCriterion(Registrable):
     # TODO: #54 Figure out if we need this target_mask based normalization? 
     # # Similarly, only update logits (or not mask logits) for steps
     # # we rollout out for,
-    # target_masks = util.get_text_field_mask(target_tokens)
+    target_masks = util.get_text_field_mask(target_tokens)
     
-    # # target_masks: (batch_size, num_rollout_steps)
-    # target_masks = target_masks[:, rollout_steps]
+    # target_masks: (batch_size, num_rollout_steps)
+    target_masks = target_masks[:, rollout_steps]
 
-    # non_batch_dims = tuple(range(1, len(target_masks.shape)))
+    non_batch_dims = tuple(range(1, len(target_masks.shape)))
 
-    # # loss_batch: (batch_size,)
-    # loss_batch_unnormalized = (losses * target_masks).sum(dim=non_batch_dims)
+    # loss_batch: (batch_size,)
+    loss_batch_unnormalized = (losses * target_masks).sum(dim=non_batch_dims)
 
-    # # Generate denominator for normalizing loss across batch.
-    # # Ideally this will be equal to batch_size, but this is a
-    # # safer way to do this. Here, we ignore sequences with all
-    # # pad tokens.
+    # Generate denominator for normalizing loss across batch.
+    # Ideally this will be equal to batch_size, but this is a
+    # safer way to do this. Here, we ignore sequences with all
+    # pad tokens.
 
-    # # shape : (batch_size,)
-    # target_mask_sum = target_masks.sum(dim=non_batch_dims) + 1e-45
+    # shape : (batch_size,)
+    target_mask_sum = target_masks.sum(dim=non_batch_dims) + 1e-45
 
-    # loss_batch = loss_batch_unnormalized/target_mask_sum
-    loss_batch = losses.mean(dim=-1)
+    loss_batch = loss_batch_unnormalized/target_mask_sum
+    # loss_batch = losses.mean(dim=-1)
     
-    return loss_batch, cost_functions, rollout_steps
+    return loss_batch, cost_functions, rollout_steps, losses
 
   def _compute_rollout_loss_single_iter(self, 
                         rollin_output_dict: Dict[str, torch.Tensor],

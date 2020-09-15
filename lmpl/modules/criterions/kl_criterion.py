@@ -77,10 +77,9 @@ class KLLossCriterion(LossCriterion):
       step_logits = F.log_softmax(step_logits, dim=-1)
 
       # scattered_logits: (batch_size,  num_tokens_to_rollout)
-      scattered_logits: torch.FloatTensor = torch.gather(
-                                                  input=step_logits, 
-                                                  dim=-1, 
-                                                  index=next_tokens)
+      scattered_logits: torch.FloatTensor = torch.gather(input=step_logits, 
+                                                          dim=-1, 
+                                                          index=next_tokens)
 
       # x: (batch_size, num_tokens_to_rollout)
       x = scattered_logits # F.log_softmax(scattered_logits, dim=-1)

@@ -241,21 +241,25 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         for i, step in enumerate(context_iterator):
             # Always do rollout for first step and the last step. 
            
-            if i == 0  and self._include_first or \
-               i == context_iterator_len and self._include_last or \
+            if (i == 0) and self._include_first or \
+               (i == context_iterator_len - 1) and self._include_last or \
                random.random() < rollout_ratio:
-                rollout_contexts.append(step)          
+                    rollout_contexts.append(step)
    
-        
         num_rollout_contexts = len(rollout_contexts)
         if num_rollout_contexts < self._min_num_contexts:
-            num_rollout_contexts = max(self._min_num_contexts,
-                                        int(rollout_ratio * context_iterator_len))
-            rollout_contexts += np.random.choice(list(context_iterator), 
-                                                    num_rollout_contexts, 
+            num_additional_contexts = max(int(rollout_ratio * context_iterator_len),
+                                            self._min_num_contexts) \
+                                         - len(rollout_contexts)
+            
+            remaining_contexts = [x for x in context_iterator if x not in rollout_contexts]
+
+            rollout_contexts += np.random.choice(remaining_contexts,
+                                                    num_additional_contexts,
                                                     replace=False).tolist()
 
-        elif num_rollout_contexts > self._max_num_contexts:
+        num_rollout_contexts = len(rollout_contexts)
+        if num_rollout_contexts > self._max_num_contexts:
             sorted_rollout_contexts = sorted(rollout_contexts)
             rollout_contexts = []
             num_contexts = self._max_num_contexts
@@ -270,12 +274,13 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                 sorted_rollout_contexts = sorted_rollout_contexts[:-1]
                 num_contexts -= 1
 
-            rollout_contexts += np.random.choice(sorted_rollout_contexts, 
-                                                num_contexts, 
-                                                replace=False).tolist()
+            rollout_contexts += np.random.choice(sorted_rollout_contexts,
+                                                    num_contexts,
+                                                    replace=False).tolist()
 
-
-        return rollout_contexts
+        # Sorting it here as while accumulating rollin decoder hidden state, we expect
+        # the rollins to be sorted in increasing order of timestep.
+        return sorted(rollout_contexts)
 
     def get_num_tokens_to_rollout(self):
         num_tokens_to_rollout = min(self._num_tokens_to_rollout, self._num_classes)
@@ -416,12 +421,25 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             # shape (rollout_start_predictions) : (batch_size * num_tokens_to_rollout)
             rollout_start_predictions = searnn_next_step_tokens.reshape(-1)
 
+            accumulated_decoder_context_length = rollin_decoder_context.size(1)
+            accumulated_decoder_hiddens_length = rollin_decoder_hiddens.size(1)
+
+            assert accumulated_decoder_context_length == accumulated_decoder_context_length, \
+                    "decoder's accumulated hidden and context lengths during rollins should be same"
+            
+            if i < accumulated_decoder_context_length - 1:
+                rollin_decoder_context_ith = rollin_decoder_context[:, i]
+                rollin_decoder_hiddens_ith = rollin_decoder_hiddens[:, i]
+            else:
+                rollin_decoder_context_ith = rollin_decoder_context[:, -1]
+                rollin_decoder_hiddens_ith = rollin_decoder_hiddens[:, -1]
+
             target_prefixes, target_tokens_truncated   = \
                     reshape_targets(targets, step, num_tokens_to_rollout)
             rollout_state = reshape_decoder_hidden_and_context(
                                     state=rollout_state, 
-                                    rollin_decoder_context=rollin_decoder_context[:, i],
-                                    rollin_decoder_hiddens=rollin_decoder_hiddens[:, i],
+                                    rollin_decoder_context=rollin_decoder_context_ith,
+                                    rollin_decoder_hiddens=rollin_decoder_hiddens_ith,
                                     step=step, 
                                     num_tokens_to_rollout=num_tokens_to_rollout)
 
@@ -471,7 +489,8 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         # for which we need to do rollouts later.
         self._decoder_net._accumulate_hidden_states = True
 
-        context_iter=self._rollout_iter_function(num_decoding_steps)
+        # +1 because we start at 1 and we need to rollout num_decoding_steps which is usually length - 1. 
+        context_iter=self._rollout_iter_function(num_decoding_steps + 1)
         rollout_contexts = self.get_contexts_to_rollout(rollout_ratio=self._rollout_ratio,
                                                     num_decoding_steps=num_decoding_steps,
                                                     context_iterator=context_iter)
