@@ -11,7 +11,9 @@ class TestKLLossCriterion(AllenNlpTestCase):
     rollin_dict = {}
     rollout_dict = {}
     state = {'epoch': 1, 
-             'batch_number': 1,}
+             'batch_number': 1,
+             'training': False,
+            }
     target_tokens = {'tokens':
           {'tokens': torch.LongTensor([[1,2,3,4,9,10,11,12],
                                        [5,6,7,8,13,14,15,16]])}}
@@ -55,7 +57,9 @@ class TestKLLossCriterion(AllenNlpTestCase):
 
   def test_kl_loss_is_equiv_to_mle_w_high_temp(self):
     state = {'epoch': 1, 
-          'batch_number': 1,}
+               'batch_number': 1,
+                'training': False,
+              }
     targets = torch.LongTensor([[1,2,3,4],
                                 [5,6,7,8]])
     target_masks = torch.LongTensor([[1,1,1,1],
@@ -105,7 +109,7 @@ class TestKLLossCriterion(AllenNlpTestCase):
       step = rollout_output_dict['step']
       target_step = targets[:, step]
       next_tokens = rollout_output_dict['next_tokens']
-      return (next_tokens != target_step[0]).int() + (next_tokens != target_step[1]).int()
+      return (next_tokens != target_step[0]).float() + (next_tokens != target_step[1]).float()
 
     criterion._compute_rollout_cost = local_compute_rollout_cost
     

@@ -453,7 +453,6 @@ class BaseRollinRolloutDecoder(SeqDecoder):
 
         # State timestep which we might in _prepare_output_projections.
         state['timestep'] = timestep
-
         # shape: (group_size, num_classes)
         class_logits, state = self._prepare_output_projections(
                                                 last_predictions=input_choices,
@@ -496,7 +495,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
         state: Dict[str, torch.Tensor] = {}
         decoder_init_state: Dict[str, torch.Tensor] = {}
 
-        state = copy.copy(encoder_out)
+        state.update(copy.copy(encoder_out))
         # In Seq2Seq setting, we will encode the source sequence,
         # and init the state object with encoder output and decoder
         # cell will use these encoder outputs for attention/initing
@@ -558,7 +557,8 @@ class BaseRollinRolloutDecoder(SeqDecoder):
             # While validating or testing we need to roll out the learned policy and the output
             # of this rollout is used to compute the secondary metrics
             # like BLEU.
-            state = copy.copy(encoder_out)
+            state: Dict[str, torch.Tensor] = {}
+            state.update(copy.copy(encoder_out))
             state.update(decoder_init_state)
 
             rollout_output_dict = self.rollout(state,
@@ -1007,6 +1007,9 @@ class BaseRollinRolloutDecoder(SeqDecoder):
 
         if self._hamming and not self.training:
             all_metrics.update({'hamming': self._hamming.get_metric(reset=reset)})
+
+        if self._loss_criterion and self._loss_criterion._shall_compute_rollout_loss:
+            all_metrics.update(self._loss_criterion.get_metric(reset=reset))
 
         if not self.training:
             if self._tensor_based_metric is not None:

@@ -90,4 +90,4 @@ class KLLossCriterion(LossCriterion):
       # kl_losses: (batch_size,)
       kl_loss = self._loss(x, y).sum(dim=-1)
       
-      return kl_loss, cost_batch, step
+      return kl_loss, cost_batch.mean(-1), step

@@ -6,6 +6,7 @@ from allennlp.common.registrable import Registrable
 from allennlp.nn import util
 
 from lmpl.modules.cost_functions.cost_function import CostFunction
+from allennlp.training.metrics import Metric, Average
 
 
 class LossCriterion(Registrable):
@@ -25,6 +26,7 @@ class LossCriterion(Registrable):
     self._labeling_smooting_ratio = labeling_smooting_ratio
     self._warm_start_for_epochs = warm_start_for_epochs
     self._warm_start_for_batch_numbers = warm_start_for_batch_numbers
+    self._average_cost = Average()
 
   def __call__(self,
               rollin_output_dict: Dict[str, torch.Tensor],
@@ -139,7 +141,7 @@ class LossCriterion(Registrable):
               target_tokens: Dict[str, torch.Tensor] = None) -> torch.FloatTensor:
     rollout_steps = []
     losses = []
-    cost_functions = []
+    cost_batches = []
     
     for rollout_output_dict in rollout_output_dict_iter:
         loss_batch, cost_batch, step = self._compute_rollout_loss_single_iter(
@@ -149,14 +151,14 @@ class LossCriterion(Registrable):
                                                       target_tokens=target_tokens,
                                                     )
         losses.append(loss_batch)
-        cost_functions.append(cost_batch)
+        cost_batches.append(cost_batch)
         rollout_steps.append(step)
 
     # rollout_steps: (num_rollout_steps,)
     rollout_steps = torch.tensor(rollout_steps)
 
     # cost_functions: (batch_size, num_rollout_steps)
-    cost_functions = torch.stack(cost_functions, dim=1)
+    cost_batches = torch.stack(cost_batches, dim=1)
 
     # rl_losses: (batch_size, num_rollout_steps)
     losses = torch.stack(losses, dim=1)
@@ -184,8 +186,12 @@ class LossCriterion(Registrable):
 
     loss_batch = loss_batch_unnormalized/target_mask_sum
     # loss_batch = losses.mean(dim=-1)
-    
-    return loss_batch, cost_functions, rollout_steps, losses
+
+    cost_batch_unnormalized = (cost_batches * target_masks).sum(dim=non_batch_dims)
+    average_cost =  (cost_batch_unnormalized/target_mask_sum).mean()
+    self._average_cost(average_cost.cpu().item())
+
+    return loss_batch, cost_batches, rollout_steps, losses
 
   def _compute_rollout_loss_single_iter(self, 
                         rollin_output_dict: Dict[str, torch.Tensor],
@@ -280,3 +286,6 @@ class LossCriterion(Registrable):
                         relevant_targets, relevant_mask, 
                         label_smoothing=self._labeling_smooting_ratio, 
                         average=None)
+
+  def get_metric(self, reset: bool = False) -> Dict[str, float]:
+    return {'cost': self._average_cost.get_metric(reset=reset)}
