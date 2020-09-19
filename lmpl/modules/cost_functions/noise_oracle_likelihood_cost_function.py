@@ -56,11 +56,11 @@ class NoiseOracleCostFunction(CostFunction):
                                     if gold_len  > pred_len  and  \
                                         self._add_brevity_penalty \
                                else 0
-            oracle_probs.append(np.log(oracle_probs_and_seq_probs[i][0] + 1e-45) + brevity_penality)
+            oracle_probs.append((1 - math.exp(brevity_penality) * oracle_probs_and_seq_probs[i][0])
 
         # We return neg log prob.
         # The objective should be minimize this cost to 0.
-        return -1 * torch.FloatTensor(oracle_probs) \
+        return torch.FloatTensor(oracle_probs) \
             .to(torch.cuda.current_device()
                 if torch.cuda.is_available() else 'cpu')
 

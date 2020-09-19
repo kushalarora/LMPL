@@ -65,6 +65,7 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
                  rollout_ratio: float = 1.0,
                  detach_rollin_logits: bool = True,
                  max_num_contexts: int = 10,
+                 min_num_contexts: int = 1,
                 include_first: bool = True,
                 include_last: bool = False,
             ) -> None:
@@ -120,6 +121,6 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
             include_first=include_first,
             include_last=include_last,
             max_num_contexts=max_num_contexts,
-            min_num_contexts=1,
+            min_num_contexts=min_num_contexts,
     )
 
