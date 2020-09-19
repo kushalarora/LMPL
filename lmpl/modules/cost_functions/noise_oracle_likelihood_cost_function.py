@@ -8,7 +8,7 @@ from lmpl.oracles.oracle_base import Oracle
 import logging
 import numpy as np
 import torch
-
+import math
 
 @CostFunction.register("noisy_oracle")
 class NoiseOracleCostFunction(CostFunction):
