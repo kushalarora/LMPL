@@ -56,7 +56,7 @@ class NoiseOracleCostFunction(CostFunction):
                                     if gold_len  > pred_len  and  \
                                         self._add_brevity_penalty \
                                else 0
-            oracle_probs.append((1 - math.exp(brevity_penality) * oracle_probs_and_seq_probs[i][0])
+            oracle_probs.append(1 - math.exp(brevity_penality) * oracle_probs_and_seq_probs[i][0])
 
         # We return neg log prob.
         # The objective should be minimize this cost to 0.
