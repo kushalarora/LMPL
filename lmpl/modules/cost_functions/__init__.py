@@ -1,4 +1,3 @@
 from lmpl.modules.cost_functions.cost_function import CostFunction
-from lmpl.modules.cost_functions.noise_oracle_likelihood_cost_function import NoiseOracleCostFunction
 from lmpl.modules.cost_functions.hamming_loss_cost_function import HammingCostFunction
 from lmpl.modules.cost_functions.bleu_cost_function import BLEUCostFunction
