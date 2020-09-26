@@ -93,7 +93,9 @@ def get_neighbor_tokens(num_neighbors_to_add:int,
     left_context = min(step, num_neighbors_to_add//2)
     right_context = min(num_decoding_steps - step, num_neighbors_to_add - left_context)
 
-    neighbor_tokens = targets[:, step-left_context] + targets[:, step+right_context]
+    neighbor_tokens = torch.cat([targets[:, step-left_context:],
+                                 targets[:, :step+right_context]),
+                                dim=-1)
     return neighbor_tokens
 
 def extend_targets_by_1(targets: torch.LongTensor):
