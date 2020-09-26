@@ -120,7 +120,7 @@ class ReinforceCriterion(LossCriterion):
                                           logits: torch.FloatTensor, 
                                           mask: torch.LongTensor):
       # entropy_seq: (batch_size, num_decoding_steps - 1)
-      entropy_seq =  -1 * (F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1).sum(dim=-1)
+      entropy_seq =  -1 * (F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1)).sum(dim=-1)
       entropy_seq *= mask
       num_tokens_per_seq = mask.sum(dim=-1)
       # normalize_entropy: (batch_size, )
