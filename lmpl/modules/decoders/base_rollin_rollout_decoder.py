@@ -322,11 +322,13 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                                ) -> torch.FloatTensor:
         # TODO(Kushal): #5 This is a temporary fix. Ideally, we should have
         # an individual oracle for this which is different from cost function.
-        assert hasattr(self._rollout_cost_function, "_oracle"), \
+        assert hasattr(self._loss_criterion, "_rollout_cost_function") and \
+                     hasattr(self._loss_criterion._rollout_cost_function, "_oracle"), \
                 "For oracle reference policy, we will need noisy oracle loss function"
 
         start_time = time.time()
-        target_logits, state = self._rollout_cost_function \
+        target_logits, state = self._loss_criterion \
+                                    ._rollout_cost_function \
                                     ._oracle \
                                     .reference_step_rollout(
                                         step=timestep,
