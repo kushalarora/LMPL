@@ -93,7 +93,7 @@ def get_neighbor_tokens(num_neighbors_to_add:int,
     left_context = min(step, num_neighbors_to_add//2)
     right_context = min(num_decoding_steps - step, num_neighbors_to_add - left_context)
 
-    neighbor_tokens = targets[:, step-left_context: step+right_context]
+    neighbor_tokens = targets[:, step-left_context] + targets[: step+right_context]
     return neighbor_tokens
 
 def extend_targets_by_1(targets: torch.LongTensor):
@@ -321,6 +321,9 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         # step_logits: (batch_size, vocab_size)
         step_logits = rollin_logits[:, step - 1, :].clone().detach()
 
+        # step_unnorm_probabilities: (batch_size, vocab_size)
+        step_unnorm_probabilities = F.softmax(step_logits, dim=-1)
+
         if self._num_neighbors_to_add > 0:
             # Select these self._num_neighbors_to_add tokens.
             # We add _num_neighbors_to_add/2 both on left and the right side.
@@ -328,7 +331,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             neighbor_tokens = get_neighbor_tokens(self._num_neighbors_to_add, 
                                                     num_decoding_steps, 
                                                     step, targets)
-            step_logits.scatter_(dim=1, index=neighbor_tokens, value=1e2)
+            step_unnorm_probabilities.scatter_(dim=1, index=neighbor_tokens, value=1)
             add_noise = True
 
         # These masks should be done after sampling and including 
@@ -337,22 +340,19 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         # TODO (@kushalarora) Do we need to mask start, end and padding tokens?
         if self._mask_padding_and_start:
             # rollout_masks: (batch_size, num_tokens_to_mask)
-            rollout_masks = self._rollout_mask.expand(step_logits.size(0), -1)
-            step_logits.scatter_(dim=1, index=rollout_masks, value=-1e2)
+            rollout_masks = self._rollout_mask.expand(step_unnorm_probabilities.size(0), -1)
+            step_unnorm_probabilities.scatter_(dim=1, index=rollout_masks, value=0)
             add_noise = True
 
         if self._must_include_target_token:
             # target_token: (batch_size, 1)
             target_token = targets[:, step].unsqueeze(1)
-            step_logits.scatter_(dim=1, index=target_token, value=1e3)
+            step_unnorm_probabilities.scatter_(dim=1, index=target_token, value=1)
 
         # softmax of masked step logits + some noise to break ties while topk.
         # noise: (batch_size, vocab_size)
-        # step_unnorm_probabilities: (batch_size, vocab_size)
-        step_unnorm_probabilities = F.softmax(step_logits, dim=-1)
-        
         if add_noise:
-            noise = 1e-5 * torch.empty_like(step_logits).uniform_(0,1)
+            noise = 1e-5 * torch.empty_like(step_unnorm_probabilities).uniform_(0,1)
             step_unnorm_probabilities += noise
 
         # searnn_next_step_tokens: (batch_size, num_tokens_to_rollout)
