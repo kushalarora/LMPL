@@ -162,6 +162,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                  include_last: bool = False,
                  max_num_contexts: int = sys.maxsize,
                  min_num_contexts: int = 2,
+                 num_random_tokens_to_add = 0,
                 ) -> None:
         super().__init__(
             vocab=vocab,
@@ -212,6 +213,8 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                                            device=self.current_device)
 
         self._num_neighbors_to_add = num_neighbors_to_add
+        
+        self._num_random_tokens_to_add = num_random_tokens_to_add
 
         self._do_max_rollout_steps = do_max_rollout_steps
 
@@ -336,6 +339,11 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             step_unnorm_probabilities.scatter_(dim=1, index=neighbor_tokens, value=1)
             add_noise = True
 
+        if self._num_random_tokens_to_add > 0:
+            random_tokens = torch.multinomial(torch.ones_like(step_unnorm_probabilities), self._num_neighbors_to_add)
+            step_unnorm_probabilities.scatter_(dim=1, index=random_tokens, value=1)
+            add_noise = True
+
         # These masks should be done after sampling and including 
         # random words and neighbors as they might include start,
         # EOS and padding tokens, we should do this after selecting those.
@@ -357,6 +365,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             noise = 1e-5 * torch.empty_like(step_unnorm_probabilities).uniform_(0,1)
             step_unnorm_probabilities += noise
 
+        
         # searnn_next_step_tokens: (batch_size, num_tokens_to_rollout)
         searnn_next_step_tokens = torch.multinomial(step_unnorm_probabilities, 
                                                     num_tokens_to_rollout)
