@@ -468,7 +468,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
 
         # shape: (group_size, num_classes)
         class_logits, state = rollout_policy(timestep, last_predictions, state, class_logits)
-        class_logits = top_k_top_p_filtering(class_logits, self._top_k, self._top_p, 1e-30)
+        class_logits = top_k_top_p_filtering(class_logits, self._top_k, self._top_p)
         return class_logits, state
 
     @overrides
