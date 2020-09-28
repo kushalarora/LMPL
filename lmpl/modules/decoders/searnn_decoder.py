@@ -341,7 +341,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             step_unnorm_probabilities.scatter_(dim=1, index=neighbor_tokens, value=1)
 
         if self._num_random_tokens_to_add > 0:
-            random_tokens = torch.multinomial(torch.ones_like(step_unnorm_probabilities), self._num_neighbors_to_add)
+            random_tokens = torch.multinomial(torch.ones_like(step_unnorm_probabilities), self._num_random_tokens_to_add)
             step_unnorm_probabilities.scatter_(dim=1, index=random_tokens, value=1)
 
         # These masks should be done after sampling and including 

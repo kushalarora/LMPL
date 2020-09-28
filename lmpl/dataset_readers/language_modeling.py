@@ -82,7 +82,7 @@ class LanguageModelingDatasetReader(DatasetReader):
 
         with open(file_path) as file:
             for sentence in file:
-                instance = self.text_to_instance(sentence)
+                instance = self.text_to_instance(sentence.strip())
                 if instance.fields['target_tokens'].sequence_length() <= self._max_sequence_length:
                     yield instance
                 else:
