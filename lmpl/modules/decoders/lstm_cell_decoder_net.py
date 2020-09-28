@@ -173,27 +173,27 @@ class LstmCellDecoderNet(DecoderNet):
 
         # shape (decoder_hidden): (batch_size, decoder_output_dim)
         # shape (decoder_context): (batch_size, decoder_output_dim)
-        with torch.cuda.amp.autocast(False):
-            if self._num_decoder_layers > 1:
-                _, (decoder_hidden, decoder_context) = self._decoder_cell(decoder_input.unsqueeze(0),
-                                                                        decoder_hidden_and_context)
-                decoder_output = decoder_hidden[-1]
-
-                # This is needed because LSTM expects input to be
-                # num_layers * num_directions, batchsize, hidden_dim
-                # whereas everywhere else we expect batch size to be the 
-                # first dimension of the tensor. Here, reverting batch_size as 
-                # the first dimension.
-                decoder_hidden = decoder_hidden.transpose(0,1).contiguous()
-                decoder_context = decoder_context.transpose(0,1).contiguous()
-            else:
-                decoder_hidden, decoder_context = self._decoder_cell(decoder_input, 
+        if self._num_decoder_layers > 1:
+            _, (decoder_hidden, decoder_context) = self._decoder_cell(decoder_input.unsqueeze(0),
                                                                     decoder_hidden_and_context)
-                decoder_output = decoder_hidden
-                # This is needed as LSTMCell returns (batch_size, hidden_dim) tensor. We unsqueeze 
-                # at 1 to indicate that there is only one layer.
-                decoder_hidden = decoder_hidden.unsqueeze(1)
-                decoder_context = decoder_context.unsqueeze(1)
+            decoder_output = decoder_hidden[-1]
+
+            # This is needed because LSTM expects input to be
+            # num_layers * num_directions, batchsize, hidden_dim
+            # whereas everywhere else we expect batch size to be the 
+            # first dimension of the tensor. Here, reverting batch_size as 
+            # the first dimension.
+            decoder_hidden = decoder_hidden.transpose(0,1).contiguous()
+            decoder_context = decoder_context.transpose(0,1).contiguous()
+        else:
+            decoder_hidden, decoder_context = self._decoder_cell(decoder_input, 
+                                                                decoder_hidden_and_context)
+            decoder_output = decoder_hidden
+            # This is needed as LSTMCell returns (batch_size, hidden_dim) tensor. We unsqueeze 
+            # at 1 to indicate that there is only one layer.
+            decoder_hidden = decoder_hidden.unsqueeze(1)
+            decoder_context = decoder_context.unsqueeze(1)
+
         decoder_hiddens = previous_state.get('decoder_accumulated_hiddens')
         decoder_contexts = previous_state.get('decoder_accumulated_contexts')
         if self._accumulate_hidden_states:
