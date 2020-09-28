@@ -164,6 +164,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                  min_num_contexts: int = 2,
                  num_random_tokens_to_add = 0,
                  add_noise_to_sampling = True,
+                 max_sampling_noise = 1e-5,
                 ) -> None:
         super().__init__(
             vocab=vocab,
@@ -238,7 +239,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         self._max_num_contexts = max_num_contexts
         self._min_num_contexts = min_num_contexts
         self._add_noise_to_sampling = add_noise_to_sampling
-
+        self._max_sampling_noise = max_sampling_noise
     def get_contexts_to_rollout(self,
                                 context_iterator:Iterable[int], 
                                 num_decoding_steps:int,
@@ -361,7 +362,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         # softmax of masked step logits + some noise to break ties while topk.
         # noise: (batch_size, vocab_size)
         if self._add_noise_to_sampling:
-            noise = 1e-1 * torch.empty_like(step_unnorm_probabilities).uniform_(0,1)
+            noise = self._max_sampling_noise * torch.empty_like(step_unnorm_probabilities).uniform_(0,1)
 
             step_unnorm_probabilities += noise
 
