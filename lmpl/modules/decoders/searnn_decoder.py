@@ -94,7 +94,7 @@ def get_neighbor_tokens(num_neighbors_to_add:int,
     right_context = min(num_decoding_steps - step, num_neighbors_to_add - left_context)
 
     neighbor_tokens = torch.cat([targets[:, step-left_context:],
-                                 targets[:, :step+right_context]),
+                                 targets[:, :step+right_context]],
                                 dim=-1)
     return neighbor_tokens
 
@@ -362,7 +362,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         # noise: (batch_size, vocab_size)
         if self._add_noise_to_sampling:
             noise = 1e-1 * torch.empty_like(step_unnorm_probabilities).uniform_(0,1)
-            
+
             step_unnorm_probabilities += noise
 
         
