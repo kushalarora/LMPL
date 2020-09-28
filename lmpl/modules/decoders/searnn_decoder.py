@@ -163,6 +163,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                  max_num_contexts: int = sys.maxsize,
                  min_num_contexts: int = 2,
                  num_random_tokens_to_add = 0,
+                 add_noise_to_sampling = True,
                 ) -> None:
         super().__init__(
             vocab=vocab,
@@ -236,6 +237,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         self._include_last = include_last
         self._max_num_contexts = max_num_contexts
         self._min_num_contexts = min_num_contexts
+        self._add_noise_to_sampling = add_noise_to_sampling
 
     def get_contexts_to_rollout(self,
                                 context_iterator:Iterable[int], 
@@ -312,7 +314,6 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             So that topk or sampling doesn't return masked values 
             and always returns selected values.
         """
-        add_noise = False
         # If num_tokens_to_rollout >= num_classes, we return all the tokens in logits.
         # This saves computation. Additionally, torch.multinomial for large 
         # num_tokens_to_rollout, sometime ends up returning duplicates 
@@ -337,12 +338,10 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                                                     num_decoding_steps, 
                                                     step, targets)
             step_unnorm_probabilities.scatter_(dim=1, index=neighbor_tokens, value=1)
-            add_noise = True
 
         if self._num_random_tokens_to_add > 0:
             random_tokens = torch.multinomial(torch.ones_like(step_unnorm_probabilities), self._num_neighbors_to_add)
             step_unnorm_probabilities.scatter_(dim=1, index=random_tokens, value=1)
-            add_noise = True
 
         # These masks should be done after sampling and including 
         # random words and neighbors as they might include start,
@@ -361,8 +360,9 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
 
         # softmax of masked step logits + some noise to break ties while topk.
         # noise: (batch_size, vocab_size)
-        if add_noise:
-            noise = 1e-5 * torch.empty_like(step_unnorm_probabilities).uniform_(0,1)
+        if self._add_noise_to_sampling:
+            noise = 1e-1 * torch.empty_like(step_unnorm_probabilities).uniform_(0,1)
+            
             step_unnorm_probabilities += noise
 
         
