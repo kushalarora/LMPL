@@ -133,6 +133,7 @@ class SampledBeamSearch:
         # shape: (batch_size, num_classes)
         start_class_logits, state = step(0, start_predictions, start_state)
         start_class_log_probabilities = F.log_softmax(start_class_logits, dim=-1)
+        start_class_log_probabilities[torch.isnan(start_class_log_probabilities)] = -1e30
 
         num_classes = start_class_log_probabilities.size()[1]
         step_logits.append(start_class_logits
@@ -239,6 +240,8 @@ class SampledBeamSearch:
             if sampled:
                 # HACK: Add noise so that you can sample multiple predictions.
                 # Else, this leads error in case only one prediction is non zero. 
+                cleaned_log_probabilities[torch.isnan(cleaned_log_probabilities)] = -1e30
+                
                 cleaned_probabilities = torch.exp(cleaned_log_probabilities/self.temperature) + \
                                             10**-20 * cleaned_log_probabilities.new_zeros(cleaned_log_probabilities.shape).uniform_(0,1)
                 predicted_classes = torch.multinomial(cleaned_probabilities, per_node_beam_size)

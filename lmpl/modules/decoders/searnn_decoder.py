@@ -327,7 +327,8 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
 
         # step_logits: (batch_size, vocab_size)
         step_logits = rollin_logits[:, step - 1, :].clone().detach()
-
+        step_logits[torch.isnan(step_logits)] = -1e30
+        
         # step_unnorm_probabilities: (batch_size, vocab_size)
         step_unnorm_probabilities = F.softmax(step_logits, dim=-1)
 
