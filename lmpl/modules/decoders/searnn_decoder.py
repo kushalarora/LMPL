@@ -165,6 +165,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                  num_random_tokens_to_add = 0,
                  add_noise_to_sampling = True,
                  max_sampling_noise = 1e-5,
+                 sampling_temperature=10,
                 ) -> None:
         super().__init__(
             vocab=vocab,
@@ -240,6 +241,8 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         self._min_num_contexts = min_num_contexts
         self._add_noise_to_sampling = add_noise_to_sampling
         self._max_sampling_noise = max_sampling_noise
+        self._sampling_temperature = sampling_temperature
+
     def get_contexts_to_rollout(self,
                                 context_iterator:Iterable[int], 
                                 num_decoding_steps:int,
@@ -330,7 +333,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         step_logits[torch.isnan(step_logits)] = -1e30
         
         # step_unnorm_probabilities: (batch_size, vocab_size)
-        step_unnorm_probabilities = F.softmax(step_logits, dim=-1)
+        step_unnorm_probabilities = F.softmax(step_logits/self._sampling_temperature, dim=-1)
 
         if self._num_neighbors_to_add > 0:
             # Select these self._num_neighbors_to_add tokens.
