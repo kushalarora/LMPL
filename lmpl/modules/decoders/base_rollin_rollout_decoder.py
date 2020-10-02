@@ -676,7 +676,6 @@ class BaseRollinRolloutDecoder(SeqDecoder):
         else:
             raise ConfigurationError(f"{self._scheduled_sampling_type} is not a valid scheduled sampling type.")
 
-        self._ss_ratio.reset()
         self._ss_ratio(self._scheduled_sampling_ratio)
         self.training_iteration += 1
 
