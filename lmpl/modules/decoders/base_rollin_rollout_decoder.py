@@ -668,11 +668,11 @@ class BaseRollinRolloutDecoder(SeqDecoder):
             # This is same scheduled sampling ratio set by config.
             pass
         elif self._scheduled_sampling_type == 'exponential':
-            self._scheduled_sampling_ratio =  k**(i + 1)
+            self._scheduled_sampling_ratio = 1- k**(i//100)
         elif self._scheduled_sampling_type == 'linear':
-            self._scheduled_sampling_ratio =  min(0.95, k/100 * i)
+            self._scheduled_sampling_ratio = i/k
         elif self._scheduled_sampling_type == 'inverse_sigmoid':
-            self._scheduled_sampling_ratio =  1 -  k/(k + math.exp(self.training_iteration/k))
+            self._scheduled_sampling_ratio = 1 - k/(k + math.exp(i//(100 * k)))
         else:
             raise ConfigurationError(f"{self._scheduled_sampling_type} is not a valid scheduled sampling type.")
 
