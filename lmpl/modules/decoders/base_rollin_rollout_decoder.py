@@ -668,7 +668,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
             # This is same scheduled sampling ratio set by config.
             pass
         elif self._scheduled_sampling_type == 'exponential':
-            self._scheduled_sampling_ratio = 1- k**(i//100)
+            self._scheduled_sampling_ratio = 1- (k/10_000_000.)**(i//100)
         elif self._scheduled_sampling_type == 'linear':
             self._scheduled_sampling_ratio = i/k
         elif self._scheduled_sampling_type == 'inverse_sigmoid':
