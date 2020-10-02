@@ -83,6 +83,7 @@ class LMPLAutoRegressiveSeqDecoder(BaseRollinRolloutDecoder):
                  scheduled_sampling_ratio: float = 0.0,
                  scheduled_sampling_k: int = 100,
                  scheduled_sampling_type: str = 'uniform',
+                 rollin_mode="teacher_forcing",
 
                  dropout: float = None,
                  start_token: str =START_SYMBOL,
@@ -117,8 +118,8 @@ class LMPLAutoRegressiveSeqDecoder(BaseRollinRolloutDecoder):
             scheduled_sampling_ratio=scheduled_sampling_ratio,
             scheduled_sampling_k=scheduled_sampling_k,
             scheduled_sampling_type=scheduled_sampling_type,
-            rollin_mode="teacher_forcing",
-
+            rollin_mode=rollin_mode,
+            
             dropout=dropout,
             start_token=start_token,
             end_token=end_token,
