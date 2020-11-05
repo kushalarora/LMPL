@@ -3,7 +3,7 @@ from overrides import overrides
 
 import torch
 import torch.nn.functional as F
-
+import sys
 import numpy as np
 
 from allennlp.common.util import START_SYMBOL, END_SYMBOL
@@ -64,10 +64,12 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
                  rollin_rollout_mixing_coeff: float = 0.5,
                  rollout_ratio: float = 1.0,
                  detach_rollin_logits: bool = True,
-                 max_num_contexts: int = 10,
+                 max_num_contexts: int = sys.maxsize,
                  min_num_contexts: int = 1,
                 include_first: bool = True,
                 include_last: bool = False,
+                rollout_iter_start_pct: int = 0,
+                rollout_iter_end_pct: int = 100,
             ) -> None:
 
         super().__init__(
@@ -113,6 +115,8 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
             num_neighbors_to_add=0,
             do_max_rollout_steps=do_max_rollout_steps,
             rollout_iter_function=lambda x: range(1, x),
+            rollout_iter_start_pct=rollout_iter_start_pct,
+            rollout_iter_end_pct=rollout_iter_end_pct,
             mask_padding_and_start=False,
             must_include_target_token=True,
             rollout_ratio=rollout_ratio,

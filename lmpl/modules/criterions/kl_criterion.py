@@ -19,6 +19,7 @@ class KLLossCriterion(LossCriterion):
           temperature: float = 1, 
           warm_start_for_epochs: int = -1, 
           warm_start_for_batch_numbers: int = -1,
+          normalize_kl_only_over_samples: bool = False,
         ):
     super().__init__(
                 rollout_cost_function=rollout_cost_function,
@@ -31,6 +32,7 @@ class KLLossCriterion(LossCriterion):
               )
     self._temperature = temperature
     self._loss = torch.nn.KLDivLoss(reduction='none')
+    self._normalize_kl_only_over_samples = normalize_kl_only_over_samples
 
   @overrides
   def _compute_rollout_loss_single_iter(self,
@@ -74,20 +76,29 @@ class KLLossCriterion(LossCriterion):
       # we predict token at index 1 given token at 0. So, prediction 
       # corresponding to target step=t, will be at index t-1 in logits.
       step_logits: torch.FloatTensor = rollin_logits[:, step - 1, :]
-      step_logits = F.log_softmax(step_logits, dim=-1)
-
+      if not self._normalize_kl_only_over_samples:
+        step_logits = F.log_softmax(step_logits, dim=-1)
+      
+      # step_logits = step_logits/step_logits.mean(dim=-1, keepdim=True)
       # scattered_logits: (batch_size,  num_tokens_to_rollout)
       scattered_logits: torch.FloatTensor = torch.gather(input=step_logits, 
                                                           dim=-1, 
                                                           index=next_tokens)
 
       # x: (batch_size, num_tokens_to_rollout)
-      x = scattered_logits # F.log_softmax(scattered_logits, dim=-1)
+      x = scattered_logits 
+      if self._normalize_kl_only_over_samples:
+        x = F.log_softmax(scattered_logits, dim=-1)
 
       # y: (batch_size, num_tokens_to_rollout)
       y = F.softmax(-1 * self._temperature * cost_batch, dim=-1)
-  
+
       # kl_losses: (batch_size,)
-      kl_loss = self._loss(x, y).sum(dim=-1)
-      
-      return kl_loss, cost_batch.mean(-1), step
+      if self._normalize_kl_only_over_samples:
+        kl_loss = self._loss(x, y).sum(dim=-1)
+      else:
+        kl_loss =  -1 * (y * x).sum(dim=-1)
+      return {'loss_batch': kl_loss, 
+              'cost_batch': cost_batch.mean(-1), 
+              'step': step
+              }

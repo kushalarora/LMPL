@@ -144,12 +144,16 @@ class LossCriterion(Registrable):
     cost_batches = []
     
     for rollout_output_dict in rollout_output_dict_iter:
-        loss_batch, cost_batch, step = self._compute_rollout_loss_single_iter(
+        rollout_loss_single_iter_output = self._compute_rollout_loss_single_iter(
                                                       rollin_output_dict=rollin_output_dict,
                                                       rollout_output_dict=rollout_output_dict,
                                                       state=state,
                                                       target_tokens=target_tokens,
                                                     )
+        loss_batch = rollout_loss_single_iter_output['loss_batch']
+        cost_batch = rollout_loss_single_iter_output['cost_batch']
+        step = rollout_loss_single_iter_output['step']
+        
         losses.append(loss_batch)
         cost_batches.append(cost_batch)
         rollout_steps.append(step)
@@ -187,7 +191,7 @@ class LossCriterion(Registrable):
     loss_batch = loss_batch_unnormalized/target_mask_sum
     # loss_batch = losses.mean(dim=-1)
 
-    cost_batch_unnormalized = (cost_batches * target_masks).sum(dim=non_batch_dims)
+    cost_batch_unnormalized = (cost_batches.mean(dim=-1) * target_masks).sum(dim=non_batch_dims)
     average_cost =  (cost_batch_unnormalized/target_mask_sum).mean()
     self._average_cost(average_cost.cpu().item())
 
@@ -221,23 +225,53 @@ class LossCriterion(Registrable):
             ) -> torch.FloatTensor:
     """ Compute the roll out cost for rolled out predictions.
     """
+    batch_size, beam_size, _, _ = rollout_output_dict['logits'].shape
+
     if self._rollout_cost_function.takes_decoded_input():
         # This is for rollout cost function like BLEU or Noisy Oracle for OCR.
         decoded_predictions = rollout_output_dict["decoded_predictions"]
         decoded_targets = rollout_output_dict.get("decoded_targets")
-        cost_batch = self._rollout_cost_function(
-                                      predictions=decoded_predictions,
-                                      gold_labels=decoded_targets)
+        def flatten(beam_size, predicted_tokens, targets=None):
+          """ Flatten predictions and targets on the beam_size dimension.
+              Input dim: (batch_size, beam_size, seq_lens)
+              Output dim: (batch_size * beam_size, seq_lens)
+          """
+          for beams in predicted_tokens:
+            assert beam_size == len(beams)
+
+          flattened_predictions =  [tokens for beams in predicted_tokens for tokens in beams]
+          flattened_targets = None
+          if targets:
+            flattened_targets = [target for _ in range(beam_size) for target in targets]
+          return flattened_predictions, flattened_targets
+
+        def unflatten(cost_batch, beam_size):
+          """ Return we get is of shape (batch_size * beam). 
+              We reshape the cost_batch tensor to shape (batch_size, beam_size)
+          """
+          return cost_batch.unsqueeze(1).reshape(batch_size, beam_size)
+
+        flattened_predictions, flattened_targets = flatten(beam_size,
+                                                            decoded_predictions, 
+                                                            decoded_targets,
+                                                          )
+        flattened_cost_batch = self._rollout_cost_function(
+                                      predictions=flattened_predictions,
+                                      gold_labels=flattened_targets)
+        cost_batch = unflatten(flattened_cost_batch, beam_size)
     else:
+        def expand(tensor, beam_size):
+            return tensor.unsqueeze(1) \
+                          .expand(batch_size, beam_size, -1)
+
+        predicted_tokens = rollout_output_dict['predictions']
         targets = rollout_output_dict['targets']
         target_masks = rollout_output_dict['target_masks']
-        predicted_tokens = rollout_output_dict['predictions']
-        top_predicted_tokens = predicted_tokens[:, 0, :]
+
         cost_batch = self._rollout_cost_function(
-                                predictions=top_predicted_tokens,
-                                gold_labels=targets,
-                                mask=target_masks)
-    
+                                          predictions=predicted_tokens,
+                                          gold_labels=expand(targets, beam_size),
+                                          mask=expand(target_masks, beam_size))
     if 'logits' in rollout_output_dict:
       cost_batch = cost_batch.to(rollout_output_dict['logits'].dtype) \
                               .to(rollout_output_dict['logits'].device)

@@ -572,8 +572,8 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                                         truncate_at_end_all=False)
 
             output_dict.update(rollout_output_dict)
-
-            decoded_predictions = rollout_output_dict["decoded_predictions"]
+            decoded_predictions = [predictions[0] \
+                                    for predictions in rollout_output_dict["decoded_predictions"]]
             output_dict["detokenized_predictions"] = \
                             self._detokenizer(decoded_predictions)
 
@@ -617,31 +617,35 @@ class BaseRollinRolloutDecoder(SeqDecoder):
         return output_dict
 
     def _decode_tokens(self,
-                       predicted_indices: torch.Tensor,
+                       batch_predicted_indices: torch.Tensor,
                        vocab_namespace:str ='tokens',
                        truncate=False) -> List[str]:
-        if not isinstance(predicted_indices, numpy.ndarray):
-            predicted_indices = predicted_indices.detach().cpu().numpy()
+        if not isinstance(batch_predicted_indices, numpy.ndarray):
+            batch_predicted_indices = batch_predicted_indices.detach().cpu().numpy()
         all_predicted_tokens = []
-        for indices in predicted_indices:
+        for predicted_indices in batch_predicted_indices:
             # Beam search gives us the top k results for each source sentence in the batch
             # but we just want the single best.
-            if len(indices.shape) > 1:
-                indices = indices[0]
+            
+            if len(predicted_indices.shape) == 1:
+                predicted_indices = numpy.expand_dims(predicted_indices, axis=0)
 
-            # We add start token to the predictions.
-            # In case it is present at position 0, remove it.
-            if self._start_index == indices[0]:
-                indices = indices[1:]
+            instance_predicted_tokens = []    
+            for indices in predicted_indices:
+                # We add start token to the predictions.
+                # In case it is present at position 0, remove it.
+                if self._start_index == indices[0]:
+                    indices = indices[1:]
 
-            indices = list(indices)
-            # Collect indices till the first end_symbol
-            if truncate and self._end_index in indices:
-                indices = indices[:indices.index(self._end_index)]
-            predicted_tokens = [self._vocab.get_token_from_index(x, namespace=vocab_namespace)
-                                for x in indices]
+                indices = list(indices)
+                # Collect indices till the first end_symbol
+                if truncate and self._end_index in indices:
+                    indices = indices[:indices.index(self._end_index)]
+                predicted_tokens = [self._vocab.get_token_from_index(x, namespace=vocab_namespace)
+                                    for x in indices]
 
-            all_predicted_tokens.append(predicted_tokens)
+                instance_predicted_tokens.append(predicted_tokens)
+            all_predicted_tokens.append(instance_predicted_tokens)
         return all_predicted_tokens
 
     @overrides
@@ -670,7 +674,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
         elif self._scheduled_sampling_type == 'exponential':
             self._scheduled_sampling_ratio = 1- (k/10_000_000.)**(i//100)
         elif self._scheduled_sampling_type == 'linear':
-            self._scheduled_sampling_ratio = i/k
+            self._scheduled_sampling_ratio = i/float(k)
         elif self._scheduled_sampling_type == 'inverse_sigmoid':
             self._scheduled_sampling_ratio = 1 - k/(k + math.exp(i//(100 * k)))
         else:
@@ -786,7 +790,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                                                 truncate_at_end_all=truncate_at_end_all)
 
         logits = torch.cat(logits, dim=2)
-
+        
         # Concatenate the start tokens to the predictions.They are not
         # added to the predictions by default.
         batch_size, beam_size, _ = step_predictions.shape
