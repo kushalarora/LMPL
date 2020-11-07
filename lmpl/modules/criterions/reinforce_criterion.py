@@ -49,78 +49,104 @@ class ReinforceCriterion(LossCriterion):
                   target_tokens: Dict[str, torch.Tensor] = None,
               ) -> Tuple[torch.FloatTensor, torch.FloatTensor, int]:
 
-      # rollin_logits: (batch_size, num_rollin_steps, num_classes)
-      # rollin_predictions: (batch_size, num_rollin_steps)
-      rollin_logits: torch.FloatTensor = rollin_output_dict['logits'].squeeze(1)
-      rollin_predictions: torch.LongTensor = rollin_output_dict['predictions'].squeeze(1)
+      # rollin_logits: (batch_size, beam_size, num_rollin_steps, num_classes)
+      rollin_logits: torch.FloatTensor = rollin_output_dict['logits']
+      rollin_batch_size, rollin_beam_size, rollin_steps, rollin_num_classes = rollin_logits.shape
 
+      # rollin_predictions: (batch_size, beam_size, num_rollin_steps)
+      rollin_predictions: torch.LongTensor = rollin_output_dict['predictions']
       if self._detach_rollin_logits:
           rollin_output_dict['logits'].detach_()
 
       step: int = rollout_output_dict['step']
 
-      # cost_batch: (batch_size )
+      # cost_batch: (batch_size, beam_size)
       cost_batch = self._compute_rollout_cost(
                             rollout_output_dict=rollout_output_dict)
 
       # Only consider those logits which you did rollout for.
       # rollin_logits_prefix: (batch_size, step - 1, num_classes)
 
+      # rollout_logits: (batch_size, beam_size, num_decoding_steps - step - 1, num_classes)
+      rollout_logits: torch.FloatTensor = rollout_output_dict['logits']
+
+      rollout_batch_size, rollout_beam_size, rollout_steps, rollout_num_classes = rollout_logits.shape
+
+      assert rollout_batch_size == rollin_batch_size, f"Rollin and Rollout batch sizes should be equal." + \
+                                                           f"Rollin: {rollin_batch_size}, Rollout: {rollout_batch_size}."
+
+      assert rollin_num_classes == rollout_num_classes, f"Rollin and Rollout num_classes should be equal." + \
+                                                           f"Rollin: {rollin_num_classes}, Rollout: {rollout_num_classes}."
+              
       # We have step - 1 here because logits predict next token given the
       # current context, so they are shifted by 1 i.e., at logit index 0, 
       # we predict token at index 1 given token at 0. So, prediction 
       # corresponding to target step=t, will be at index t-1 in logits.
-      rollin_logits_prefix: torch.FloatTensor = rollin_logits[:, :step, :]
+      rollin_logits_prefix: torch.FloatTensor = rollin_logits[:, 0, :step, :]\
+                                                    .unsqueeze(1) \
+                                                    .expand(rollin_batch_size, 
+                                                            rollout_beam_size,
+                                                            step,
+                                                            rollin_num_classes)
 
-      # rollout_logits: (batch_size, num_decoding_steps - step - 1, num_classes)
-      rollout_logits: torch.FloatTensor = rollout_output_dict['logits'].squeeze(1)
-
-      # rollout_logits: (batch_size, num_decoding_steps - 1, num_classes)
+ 
+      # rollout_logits: (batch_size, beam_size, num_decoding_steps - 1, num_classes)
       rollin_rollout_logits: torch.FloatTensor = torch.cat([rollin_logits_prefix, 
                                                             rollout_logits],
-                                                          dim=1)
+                                                          dim=2)
 
       
       if self._normalize_costs:
         cost_batch = (cost_batch - cost_batch.min())/(cost_batch.max() - cost_batch.min())
   
-      # predictions: (batch_size, num_decoding_steps)
-      top_predictions = rollout_output_dict["predictions"][:, 0, :]
+      # predictions: (batch_size, beam_size, num_decoding_steps)
+      predictions = rollout_output_dict["predictions"]
       
-      # rollout_logits: (batch_size, num_decoding_steps - 1, num_classes)
+      # rollout_logits: (batch_size, beam_size, num_decoding_steps - 1, num_classes)
       rollin_rollout_logits = F.log_softmax(rollin_rollout_logits, dim=-1)
 
-      # rollout_logits: (batch_size, num_decoding_steps - 1)
+      # log_probs: (batch_size, beam_size, num_decoding_steps - 1)
       log_probs = torch.gather(rollin_rollout_logits, -1,
-                                  top_predictions[:, 1:] \
-                                    .unsqueeze(2)) \
-                        .squeeze(2)
+                                  predictions[:, :, 1:] \
+                                    .unsqueeze(dim=-1)) \
+                        .squeeze(dim=-1)
 
       # Get mask expects first detects </S> and considers all the tokens before this
       # and masks out everything after this.
-      log_prob_mask = rollout_output_dict['prediction_masks'][:, 0, 1:]
+      log_prob_mask = rollout_output_dict['prediction_masks'][:, :, 1:]
       log_probs *= log_prob_mask
+  
       num_tokens_per_seq = log_prob_mask.sum(dim=-1)
-      normalize_log_probs = log_probs.sum(dim=-1)/num_tokens_per_seq
+      normalized_log_probs = log_probs.sum(dim=-1)/num_tokens_per_seq
+
       # We are trying to maximize the reward, hence minimizing the log prob * reward.
-      rl_loss_batch =  -1 * (self._alpha**step) * normalize_log_probs * (1 - cost_batch)
+      rl_loss_batch =  -1 * (self._alpha**step) * normalized_log_probs * (1 - cost_batch)
 
       # Add entropy regularization coefficient
+      entropy_regularization_term = torch.zeros_like(rl_loss_batch)
       if self._entropy_regularization_coeff > 0:
-        rl_loss_batch += -1 * self._entropy_regularization_coeff * \
-                              self._compute_entropy_regularization_term(
+        entropy_regularization_term = self._compute_entropy_regularization_term(
                                                         logits=rollin_rollout_logits, 
                                                         mask=log_prob_mask,
                                                       )
-      return rl_loss_batch, cost_batch, step
+      rl_loss_batch += -1 * self._entropy_regularization_coeff * entropy_regularization_term
 
+      # Average over beam
+      rl_loss_batch = rl_loss_batch.sum(dim=-1)
+
+      return {'loss_batch': rl_loss_batch, 
+              'cost_batch': cost_batch, 
+              'step': step,
+              'normalized_log_probs': normalized_log_probs,
+              'entropy_regularization_term': entropy_regularization_term,
+              }
 
 
   def _compute_entropy_regularization_term(self,
                                           logits: torch.FloatTensor, 
                                           mask: torch.LongTensor):
-      # entropy_seq: (batch_size, num_decoding_steps - 1)
-      entropy_seq =  -1 * (F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1)).sum(dim=-1)
+      # entropy_seq: (batch_size, beam_size, num_decoding_steps - 1)
+      entropy_seq =  -1 * (torch.exp(logits) * logits).sum(dim=-1)
       entropy_seq *= mask
       num_tokens_per_seq = mask.sum(dim=-1)
       # normalize_entropy: (batch_size, )
