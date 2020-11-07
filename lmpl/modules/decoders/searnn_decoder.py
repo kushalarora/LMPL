@@ -1,10 +1,11 @@
 from typing import Dict, List, Tuple, Optional, Callable, Iterable, Union
 from overrides import overrides
 
+import logging
+
 import torch
 import torch.nn.functional as F
 import sys
-
 import numpy as np
 import random
 from allennlp.common.util import START_SYMBOL, END_SYMBOL
@@ -20,6 +21,8 @@ from lmpl.modules.decoders.auto_regressive_decoder import BaseRollinRolloutDecod
 from lmpl.modules.criterions import LossCriterion
 from lmpl.modules.detokenizers.detokenizer import DeTokenizer, default_tokenizer
 from lmpl.modules.utils import expand_tensor
+
+logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 def rollout_mixing_functional(batch_size, rollout_mixing_prob, num_tokens_to_rollout):
     def rollout_mixing_func():
@@ -93,8 +96,8 @@ def get_neighbor_tokens(num_neighbors_to_add:int,
     left_context = min(step, num_neighbors_to_add//2)
     right_context = min(num_decoding_steps - step, num_neighbors_to_add - left_context)
 
-    neighbor_tokens = torch.cat([targets[:, step-left_context:],
-                                 targets[:, :step+right_context]],
+    neighbor_tokens = torch.cat([targets[:, step-left_context:step],
+                                 targets[:, step+1:step+1+right_context]],
                                 dim=-1)
     return neighbor_tokens
 
@@ -153,6 +156,8 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                  mask_padding_and_start: bool = True,
                  must_include_target_token: bool = True,
                  rollout_iter_function: Callable[[int], Iterable[int]]=lambda x: range(1, x),
+                 rollout_iter_start_pct: int = 0,
+                 rollout_iter_end_pct: int = 100,
                  rollout_ratio:float = 1.0,
                  detach_rollin_logits: bool = False,
                  rollin_rollout_mixing_coeff: float = 0.25,
@@ -223,8 +228,10 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
 
         self._mask_padding_and_start = mask_padding_and_start
         self._must_include_target_token = must_include_target_token
-
         self._rollout_iter_function = rollout_iter_function
+        self._rollout_iter_start_pct = rollout_iter_start_pct
+        self._rollout_iter_end_pct = rollout_iter_end_pct
+
         self._rollout_ratio = rollout_ratio
 
         self._detach_rollin_logits = detach_rollin_logits
@@ -318,6 +325,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             So that topk or sampling doesn't return masked values 
             and always returns selected values.
         """
+        searnn_next_step_tokens = []
         # If num_tokens_to_rollout >= num_classes, we return all the tokens in logits.
         # This saves computation. Additionally, torch.multinomial for large 
         # num_tokens_to_rollout, sometime ends up returning duplicates 
@@ -342,11 +350,15 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             neighbor_tokens = get_neighbor_tokens(self._num_neighbors_to_add, 
                                                     num_decoding_steps, 
                                                     step, targets)
-            step_unnorm_probabilities.scatter_(dim=1, index=neighbor_tokens, value=1)
+            searnn_next_step_tokens += [neighbor_tokens]
+            num_tokens_to_rollout -= neighbor_tokens.size(1)
 
         if self._num_random_tokens_to_add > 0:
-            random_tokens = torch.multinomial(torch.ones_like(step_unnorm_probabilities), self._num_random_tokens_to_add)
-            step_unnorm_probabilities.scatter_(dim=1, index=random_tokens, value=1)
+            top_k_probs, top_k_indices = torch.topk(step_unnorm_probabilities, k=250)
+            random_token_indices = torch.multinomial(torch.ones_like(top_k_probs), self._num_random_tokens_to_add)
+            random_tokens = torch.gather(top_k_indices, -1, random_token_indices)
+            searnn_next_step_tokens += [random_tokens]
+            num_tokens_to_rollout -= random_tokens.size(1)
 
         # These masks should be done after sampling and including 
         # random words and neighbors as they might include start,
@@ -360,8 +372,9 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
 
         if self._must_include_target_token:
             # target_token: (batch_size, 1)
-            target_token = targets[:, step].unsqueeze(1)
-            step_unnorm_probabilities.scatter_(dim=1, index=target_token, value=1)
+            target_token = targets[:, step:step+1]
+            searnn_next_step_tokens += [target_token]
+            num_tokens_to_rollout -= 1
 
         # softmax of masked step logits + some noise to break ties while topk.
         # noise: (batch_size, vocab_size)
@@ -370,14 +383,21 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
 
             step_unnorm_probabilities += noise
 
-        
-        # searnn_next_step_tokens: (batch_size, num_tokens_to_rollout)
-        searnn_next_step_tokens = torch.multinomial(step_unnorm_probabilities, 
-                                                    num_tokens_to_rollout)
-        
+        if num_tokens_to_rollout > 0:
+            # searnn_next_step_tokens: (batch_size, num_tokens_to_rollout)
+            logit_sampled_tokens = torch.multinomial(step_unnorm_probabilities, 
+                                                        num_tokens_to_rollout)
+            searnn_next_step_tokens += [logit_sampled_tokens]
+
+
         if self._sort_next_tokens:
             searnn_next_step_tokens, _ = torch.sort(searnn_next_step_tokens)
+        
+        if False and self.training_iteration % 300 == 0:
+            logger.warn(f"Next Tokens: {searnn_next_step_tokens}")
+            logger.warn(f"Top 10: {torch.topk(step_unnorm_probabilities, k=num_tokens_to_rollout)}")
 
+        searnn_next_step_tokens = torch.cat(searnn_next_step_tokens, dim=-1)
         return searnn_next_step_tokens
 
     def get_prediction_prefixes(self, 
@@ -412,7 +432,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
 
     def get_rollout_iterator(self, 
                              rollout_contexts: List[int],
-                             rollout_state: Dict[str, torch.Tensor],
+                             rollin_state: Dict[str, torch.Tensor],
                              rollin_logits: torch.FloatTensor,
                              rollin_predictions: torch.LongTensor,
                              rollin_decoder_context: torch.FloatTensor,
@@ -424,8 +444,13 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         """ Get rollout iterator.
         """
         self._decoder_net._accumulate_hidden_states = False
-
+        
         for i, step in enumerate(rollout_contexts):
+
+            # Reshape/expand source_mask and encoder output
+            # to effective batch size of batch_size * num_tokens_to_rollout.
+            rollout_state = reshape_encoder_output(rollin_state, num_tokens_to_rollout)
+
             searnn_next_step_tokens = self.get_next_tokens(
                                                 rollin_logits=rollin_logits, 
                                                 step=step, 
@@ -484,7 +509,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                                         reference_policy_type=self._rollout_reference_policy,
                                         sampled=self._sample_rollouts,
                                     )
-
+                
             rollout_output_dict['num_tokens_to_rollout'] = num_tokens_to_rollout
             rollout_output_dict['step'] = step
             rollout_output_dict['next_tokens'] = searnn_next_step_tokens
@@ -507,7 +532,9 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         self._decoder_net._accumulate_hidden_states = True
 
         # +1 because we start at 1 and we need to rollout num_decoding_steps which is usually length - 1. 
-        context_iter=self._rollout_iter_function(num_decoding_steps + 1)
+        rollout_iter_start = max(1, int(self._rollout_iter_start_pct/100. * num_decoding_steps))
+        rollout_iter_end = int(self._rollout_iter_end_pct/100. * num_decoding_steps)
+        context_iter=range(rollout_iter_start, rollout_iter_end + 1)
         rollout_contexts = self.get_contexts_to_rollout(rollout_ratio=self._rollout_ratio,
                                                     num_decoding_steps=num_decoding_steps,
                                                     context_iterator=context_iter)
@@ -539,10 +566,6 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         
         rollin_state = state
 
-        # Reshape/expand source_mask and encoder output
-        # to effective batch size of batch_size * num_tokens_to_rollout.
-        rollout_state = reshape_encoder_output(rollin_state, num_tokens_to_rollout)
-
         # targets Shape: (batch_size, num_decoding_steps + 1)
         targets = util.get_token_ids_from_text_field_tensors(target_tokens)
 
@@ -551,7 +574,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
 
         rollout_output_dict_iter = self.get_rollout_iterator(
                                                 rollout_contexts=rollout_contexts,
-                                                rollout_state=rollout_state,
+                                                rollin_state=rollin_state,
                                                 rollin_logits=rollin_logits,
                                                 rollin_predictions=rollin_predictions,
                                                 rollin_decoder_context=rollin_decoder_context,
