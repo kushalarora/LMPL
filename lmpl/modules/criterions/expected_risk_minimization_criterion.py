@@ -35,6 +35,7 @@ class ExpectedRiskMinimization(ReinforceCriterion):
           normalize_to_0_1: bool = False,
           normalize_by_mean_std: bool = False,
           normalize_by_mean: bool = False,
+          entropy_augumented_reward: bool = True,
         ):
     super().__init__(
                 rollout_cost_function=rollout_cost_function,
@@ -52,6 +53,7 @@ class ExpectedRiskMinimization(ReinforceCriterion):
     self._normalize_to_0_1 = normalize_to_0_1
     self._normalize_by_mean_std = normalize_by_mean_std
     self._normalize_by_mean = normalize_by_mean
+    self._entropy_augumented_reward = entropy_augumented_reward
 
   @overrides
   def _compute_rollout_loss_batch(self,
@@ -104,11 +106,13 @@ class ExpectedRiskMinimization(ReinforceCriterion):
     normalized_probs = F.softmax(normalized_log_probs, dim=-1)
     # cost_batches = F.softmax(cost_batches, dim=-1)
     if self.i % 100 == 0:
-      # logging.info(entropy_regularization_terms.detach().mean())
-      logging.info(-1 * normalized_log_probs.detach().mean())
+      logging.info(f"cost: {cost_batches.mean()}")
+      logging.info(f"entropy term: {entropy_regularization_terms.detach().mean()}")
+      logging.info(f"normalized_log_prob: {-1 * normalized_log_probs.detach().mean()}")
     self.i += 1
-    # cost_batches -= 0.5 * entropy_regularization_terms.detach()
-    # cost_batches -= -1 * 0.5 * normalized_log_probs.detach()
+    
+    if self._entropy_augumented_reward:
+      cost_batches -= entropy_regularization_terms.detach()
     # import pdb; pdb.set_trace()
     if self._normalize_to_0_1:
       normalized_cost_batches = (cost_batches - cost_batches.min(dim=-1, keepdim=True)[0])/(cost_batches.max(dim=-1, keepdim=True)[0] - cost_batches.min(dim=-1, keepdim=True)[0])
