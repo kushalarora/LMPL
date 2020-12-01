@@ -112,7 +112,7 @@ class ExpectedRiskMinimization(ReinforceCriterion):
     self.i += 1
     
     if self._entropy_augumented_reward:
-      cost_batches -= entropy_regularization_terms.detach()
+      cost_batches -= self._entropy_regularization_coeff * (-1 * normalized_log_probs.detach())
     # import pdb; pdb.set_trace()
     if self._normalize_to_0_1:
       normalized_cost_batches = (cost_batches - cost_batches.min(dim=-1, keepdim=True)[0])/(cost_batches.max(dim=-1, keepdim=True)[0] - cost_batches.min(dim=-1, keepdim=True)[0])
@@ -123,7 +123,7 @@ class ExpectedRiskMinimization(ReinforceCriterion):
     else:
       normalized_cost_batches = cost_batches
 
-    losses = normalized_probs * normalized_cost_batches - self._entropy_regularization_coeff * (-1 * normalized_log_probs)
+    losses = normalized_probs * normalized_cost_batches
     # losses = -1 * entropy_regularization_terms
 
     # TODO: #54 Figure out if we need this target_mask based normalization? 
