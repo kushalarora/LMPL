@@ -17,7 +17,6 @@ from lmpl.modules.cost_functions import CostFunction
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
-i = 0
 
 @LossCriterion.register("risk")
 class ExpectedRiskMinimization(ReinforceCriterion):
@@ -49,7 +48,6 @@ class ExpectedRiskMinimization(ReinforceCriterion):
                 entropy_regularization_coeff=entropy_regularization_coeff,
                 alpha=alpha,
               )
-    self.i = 0
     self._normalize_to_0_1 = normalize_to_0_1
     self._normalize_by_mean_std = normalize_by_mean_std
     self._normalize_by_mean = normalize_by_mean
@@ -105,11 +103,6 @@ class ExpectedRiskMinimization(ReinforceCriterion):
 
     normalized_probs = F.softmax(normalized_log_probs, dim=-1)
     # cost_batches = F.softmax(cost_batches, dim=-1)
-    if self.i % 100 == 0:
-      logging.info(f"cost: {cost_batches.mean()}")
-      logging.info(f"entropy term: {entropy_regularization_terms.detach().mean()}")
-      logging.info(f"normalized_log_prob: {-1 * normalized_log_probs.detach().mean()}")
-    self.i += 1
     
     if self._entropy_augumented_reward:
       cost_batches -= self._entropy_regularization_coeff * (-1 * normalized_log_probs.detach())
