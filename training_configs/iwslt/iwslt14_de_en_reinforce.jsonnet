@@ -59,7 +59,7 @@ rl_config + {
         },],
         // "num_gradient_accumulation_steps": 4,
       },
-      // "distributed": {
-      //   "cuda_devices": [0, 1, 2, 3],
-      // },
+      "distributed": {
+        "cuda_devices": [0, 1, 2, 3],
+      },
     }
