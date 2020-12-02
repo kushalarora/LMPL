@@ -662,7 +662,6 @@ class BaseRollinRolloutDecoder(SeqDecoder):
         return output_dict
 
     def _apply_scheduled_sampling(self):
-
         if not self.training:
             raise RuntimeError("Scheduled Sampling can only be applied during training.")
 
@@ -671,12 +670,10 @@ class BaseRollinRolloutDecoder(SeqDecoder):
         if self._scheduled_sampling_type == 'uniform':
             # This is same scheduled sampling ratio set by config.
             pass
-        elif self._scheduled_sampling_type == 'exponential':
-            self._scheduled_sampling_ratio = 1- (k/10_000_000.)**(i//100)
         elif self._scheduled_sampling_type == 'linear':
             self._scheduled_sampling_ratio = i/float(k)
         elif self._scheduled_sampling_type == 'inverse_sigmoid':
-            self._scheduled_sampling_ratio = 1 - k/(k + math.exp(i//(100 * k)))
+            self._scheduled_sampling_ratio = 1 - k/(k + math.exp(i/k))
         else:
             raise ConfigurationError(f"{self._scheduled_sampling_type} is not a valid scheduled sampling type.")
 

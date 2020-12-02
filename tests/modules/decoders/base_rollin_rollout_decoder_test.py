@@ -158,8 +158,7 @@ class TestBaseRollinRolloutDecoder(AllenNlpTestCase):
         decoder: BaseRollinRolloutDecoder = build_decoder(decoder_input_dim)
         
         decoder._scheduled_sampling_type = "linear"
-        decoder._scheduled_sampling_ratio = 0.2
-        decoder._scheduled_sampling_k = 0.01
+        decoder._scheduled_sampling_k = 1_000_000
 
         decoder._apply_scheduled_sampling()
         
@@ -168,29 +167,13 @@ class TestBaseRollinRolloutDecoder(AllenNlpTestCase):
         decoder.training_iteration = 100
         decoder._apply_scheduled_sampling()
 
-        assert decoder._scheduled_sampling_ratio == 0.01
+        assert decoder._scheduled_sampling_ratio == 1e-4
 
         # Test max value
         decoder.training_iteration = 10000
         decoder._apply_scheduled_sampling()
 
-        assert decoder._scheduled_sampling_ratio == 0.95
-
-        # Test exponential
-        decoder: BaseRollinRolloutDecoder = build_decoder(decoder_input_dim)
-        decoder._scheduled_sampling_type = "exponential"
-        decoder._scheduled_sampling_ratio = 0.2
-        decoder._scheduled_sampling_k = 0.1
-
-        decoder._apply_scheduled_sampling()
-        
-        assert decoder._scheduled_sampling_ratio == 0.1
-
-        decoder.training_iteration = 3
-
-        decoder._apply_scheduled_sampling()
-
-        assert decoder._scheduled_sampling_ratio - 0.0001 < 1e-8
+        assert decoder._scheduled_sampling_ratio == 0.01
 
         # Test inverse_sigmoid:
         decoder: BaseRollinRolloutDecoder = build_decoder(decoder_input_dim)
@@ -202,7 +185,7 @@ class TestBaseRollinRolloutDecoder(AllenNlpTestCase):
         
         assert decoder._scheduled_sampling_ratio - 1/101 < 1e-8
 
-        decoder.training_iteration = 3
+        decoder.training_iteration = 100
 
         decoder._apply_scheduled_sampling()
         
@@ -215,9 +198,9 @@ class TestBaseRollinRolloutDecoder(AllenNlpTestCase):
 
         decoder = build_decoder(decoder_inout_dim)
         
-        predictions = torch.tensor([[3, 2, 5, 0, 0], [2, 2, 3, 5, 0]])
+        predictions = torch.tensor([[[3, 2, 5, 0, 0]], [[2, 2, 3, 5, 0]]])
 
-        tokens_ground_truth = [["B", "A"], ["A", "A", "B"]]
+        tokens_ground_truth = [[["B", "A"]], [["A", "A", "B"]]]
 
         output_dict = {"predictions": predictions}
         predicted_tokens = decoder.post_process(output_dict)["predicted_tokens"]
