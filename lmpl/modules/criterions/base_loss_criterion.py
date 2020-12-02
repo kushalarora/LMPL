@@ -157,7 +157,7 @@ class LossCriterion(Registrable):
         losses.append(loss_batch)
         cost_batches.append(cost_batch)
         rollout_steps.append(step)
-    
+
     # rollout_steps: (num_rollout_steps,)
     rollout_steps = torch.tensor(rollout_steps)
 
@@ -191,7 +191,8 @@ class LossCriterion(Registrable):
     loss_batch = loss_batch_unnormalized/target_mask_sum
     # loss_batch = losses.mean(dim=-1)
 
-    cost_batch_unnormalized = (cost_batches * target_masks).sum(dim=non_batch_dims)
+    cost_batch_unnormalized = (cost_batches.squeeze(dim=-1) * target_masks)\
+                                      .sum(dim=non_batch_dims)
     average_cost =  (cost_batch_unnormalized/target_mask_sum).mean()
     self._average_cost(average_cost.cpu().item())
 
@@ -242,7 +243,7 @@ class LossCriterion(Registrable):
           flattened_predictions =  [tokens for beams in predicted_tokens for tokens in beams]
           flattened_targets = None
           if targets:
-            flattened_targets = [target for _ in range(beam_size) for target in targets]
+            flattened_targets = [target[0] for _ in range(beam_size) for target in targets]
           return flattened_predictions, flattened_targets
 
         def unflatten(cost_batch, beam_size):

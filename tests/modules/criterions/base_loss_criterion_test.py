@@ -181,8 +181,8 @@ class TestBaseLossCriterion(AllenNlpTestCase):
     rollout_output_dict = {
       'decoded_predictions': [[['1', '2', '3', '4', '5']], 
                               [['6', '7', '8', '9', '10']]],
-      'decoded_targets': [['1', '2', '3', '4', '5'],
-                          ['6', '7', '8', '9', '10']],
+      'decoded_targets': [[['1', '2', '3', '4', '5']],
+                          [['6', '7', '8', '9', '10']]],
       'logits': torch.rand((2, 1, 30, 100)) # batch_size=2, beam_size=1, seq_len=30, num_classes=100.
 
     }
