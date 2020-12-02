@@ -9,7 +9,6 @@ import torch.nn.functional as F
 from overrides import overrides
 
 from allennlp.common import Params
-from allennlp.common.checks import ConfigurationError
 from tests import ModelTestCase
 from allennlp.common.util import END_SYMBOL, prepare_environment, START_SYMBOL
 from allennlp.data.vocabulary import Vocabulary
@@ -95,37 +94,41 @@ class TestSEARNNDecoder(ModelTestCase):
       num_decoding_steps = 30
       step = 10
       targets = torch.randint(0, 10, (2, num_decoding_steps))
-
+    
       # Test num_neighbors_to_add=6
       neighbors = get_neighbor_tokens(num_neighbors_to_add=6,
                                       num_decoding_steps=num_decoding_steps, 
                                       step=step, targets=targets)
-      assert torch.all(targets[:, 10-3:10+3] == neighbors)
+      true_neighbor_index = [7, 8, 9, 11, 12, 13]
+      assert torch.all(targets[:, true_neighbor_index] == neighbors)
 
       # Test support num_neighbors_to_add=0
-      neighbors = get_neighbor_tokens(num_neighbors_to_add=0,
-                                      num_decoding_steps=num_decoding_steps, 
-                                      step=step, targets=targets)
-      assert torch.all(targets[:, 10:10] == neighbors)
+      with pytest.raises(AssertionError):
+        neighbors = get_neighbor_tokens(num_neighbors_to_add=0,
+                                        num_decoding_steps=num_decoding_steps, 
+                                        step=step, targets=targets)
 
       # Test support for odd num_neighbors_to_add
       neighbors = get_neighbor_tokens(num_neighbors_to_add=5,
                                       num_decoding_steps=num_decoding_steps, 
                                       step=step, targets=targets)
-      assert torch.all(targets[:, 10-2:10+3] == neighbors)
-
+      true_neighbor_index = [8, 9, 11, 12, 13]
+      assert torch.all(targets[:, true_neighbor_index] == neighbors)
+    
       # Test support for negative (limited to 0) left context
       neighbors = get_neighbor_tokens(num_neighbors_to_add=22,
                                       num_decoding_steps=num_decoding_steps, 
                                       step=step, targets=targets)
-      assert torch.all(targets[:, 0:10+12] == neighbors)
+      true_neighbor_index = list(range(0, 10)) + list(range(11, 23))
+      assert torch.all(targets[:, true_neighbor_index] == neighbors)
 
       # Test support for overshooting right context
       step = 25
       neighbors = get_neighbor_tokens(num_neighbors_to_add=22,
                                       num_decoding_steps=num_decoding_steps, 
                                       step=step, targets=targets)
-      assert torch.all(targets[:, 25 - 11 : num_decoding_steps] == neighbors)
+      true_neighbor_index = list(range(14, 25)) + list(range(26, num_decoding_steps))
+      assert torch.all(targets[:, true_neighbor_index] == neighbors)
 
     def test_extend_targets_by_1(self):
         num_decoding_steps = 30

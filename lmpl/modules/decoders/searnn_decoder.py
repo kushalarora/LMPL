@@ -92,12 +92,13 @@ def reshape_decoder_hidden_and_context(state: Dict[str, torch.Tensor],
 def get_neighbor_tokens(num_neighbors_to_add:int, 
                         num_decoding_steps:int, 
                         step: int, targets: torch.LongTensor):
+    assert num_neighbors_to_add > 1, "Num Neighbors should always be greater than 2, i.e., at least one from each side."
     # TODO: #20 If right_context < num_neighbors_to_add/2, we end up getting fewer neighbors.
     left_context = min(step, num_neighbors_to_add//2)
     right_context = min(num_decoding_steps - step, num_neighbors_to_add - left_context)
 
-    neighbor_tokens = torch.cat([targets[:, step-left_context:step],
-                                 targets[:, step+1:step+1+right_context]],
+    neighbor_tokens = torch.cat([targets[:, step-left_context:step], # neighbors/2 left tokens
+                                 targets[:, step+1:step+1+right_context]], # neighbors/2 right tokens excluding step token.
                                 dim=-1)
     return neighbor_tokens
 
