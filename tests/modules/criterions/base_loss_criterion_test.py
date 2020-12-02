@@ -146,7 +146,8 @@ class TestBaseLossCriterion(AllenNlpTestCase):
       'targets': torch.LongTensor([[1, 2, 3, 0, 0],
                                    [6, 7, 8, 9, 0]]),
       'target_masks': torch.LongTensor([[1, 1, 1, 0, 0], 
-                                        [1, 1, 1, 1, 0]])
+                                        [1, 1, 1, 1, 0]]),
+      'logits': torch.rand((2, 1, 30, 100)) # batch_size=2, beam_size=1, seq_len=30, num_classes=100.
     }
     criterion = LossCriterion(
                     rollout_cost_function=HammingCostFunction(),
@@ -155,7 +156,7 @@ class TestBaseLossCriterion(AllenNlpTestCase):
     hamming_loss = criterion._compute_rollout_cost(
                                     rollout_output_dict)
 
-    assert torch.all(hamming_loss - torch.tensor([0.0, 0.]) < 1e-10)
+    assert torch.all(hamming_loss - torch.tensor([[0.0], [0.]]) < 1e-10)
     
     rollout_output_dict = {
       'predictions': torch.LongTensor([[[1, 2, 3, 4, 5]], 
@@ -163,25 +164,26 @@ class TestBaseLossCriterion(AllenNlpTestCase):
       'targets': torch.LongTensor([[1, 2, 3, 0, 0],
                                    [10, 9, 8, 7, 0]]),
       'target_masks': torch.LongTensor([[1, 1, 1, 0, 0], 
-                                        [1, 1, 1, 1, 0]])
+                                        [1, 1, 1, 1, 0]]),
+      'logits': torch.rand((2, 1, 30, 100)) # batch_size=2, beam_size=1, seq_len=30, num_classes=100.
     }
     criterion = LossCriterion(
                     rollout_cost_function=HammingCostFunction(),
                     shall_compute_rollout_loss=True)
-    
+
     hamming_loss = criterion._compute_rollout_cost(
                                     rollout_output_dict)
-
     # First entry of the batch is same, second entry has all different
     # except for 8 and we will mask last entry, so, error rate is 3/4.
-    assert torch.all(hamming_loss - torch.tensor([0.0, 0.75]) < 1e-10)
+    assert torch.all(hamming_loss - torch.tensor([[0.0], [0.75]]) < 1e-10)
 
     # takes_decoded_input=True
     rollout_output_dict = {
-      'decoded_predictions': [['1', '2', '3', '4', '5'], 
-                             ['6', '7', '8', '9', '10']],
+      'decoded_predictions': [[['1', '2', '3', '4', '5']], 
+                              [['6', '7', '8', '9', '10']]],
       'decoded_targets': [['1', '2', '3', '4', '5'],
-                          ['6', '7', '8', '9', '10']]
+                          ['6', '7', '8', '9', '10']],
+      'logits': torch.rand((2, 1, 30, 100)) # batch_size=2, beam_size=1, seq_len=30, num_classes=100.
 
     }
     criterion = LossCriterion(
@@ -191,7 +193,7 @@ class TestBaseLossCriterion(AllenNlpTestCase):
     bleu_loss = criterion._compute_rollout_cost(
                                     rollout_output_dict)
 
-    assert torch.all(bleu_loss - torch.tensor([0.0, 0.]) < 1e-10)
+    assert torch.all(bleu_loss - torch.tensor([[0.0], [0.]]) < 1e-10)
 
   def test_warm_start_for_epoch(self):
     rollin_dict = {}
