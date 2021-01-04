@@ -1,0 +1,29 @@
+[
+  {
+    "type": "float",
+    "attributes": {
+      "name": "lr",
+      "low": 1e-9,
+      "high": 0.01,
+      "log": true
+    }
+  }, 
+  {
+    "type": "float",
+    "attributes": {
+      "name": "weight_decay",
+      "low": 1e-9,
+      "high": 0.01,
+      "log": true
+    }
+  },
+  {
+    "type": "int",
+    "attributes": {
+      "name": "warmup_steps",
+      "low": 1000,
+      "high": 20000,
+      "step": 1000 
+    }
+  }
+]
