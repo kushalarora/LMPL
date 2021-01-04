@@ -1,0 +1,2 @@
+from lmpl.modules.decoders.decoder_net.lstm_cell_decoder_net import LstmCellDecoderNet
+from lmpl.modules.decoders.decoder_net.transformer_decoder_net import TransformerDecoderNet

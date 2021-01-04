@@ -121,6 +121,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                  tensor_based_metric: Metric = None,
                  tensor_based_metric_mask: Metric = None,
                  token_based_metric: Metric = None,
+                 eval_beam_size: int = 1,
                 ) -> None:
         super().__init__(target_embedder)
 
@@ -214,7 +215,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
 
         self._top_k = top_k
         self._top_p = top_p
-
+        self._eval_beam_size = eval_beam_size
         self._mle_loss = MaximumLikelihoodLossCriterion()
         self._perplexity = Perplexity()
 
@@ -568,6 +569,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                                         rollout_steps=num_decoding_steps,
                                         rollout_mode='learned',
                                         sampled=self._sample_rollouts,
+                                        beam_size=self._eval_beam_size,
                                         # TODO #6 (Kushal): Add a reason why truncate_at_end_all is False here.
                                         truncate_at_end_all=False)
 
@@ -606,7 +608,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                     self._tensor_based_metric_mask(  # type: ignore
                         predictions=best_predictions,
                         gold_targets=targets,
-                        mask=target_mask,
+                        mask=~target_mask,
                     )
 
                 if self._token_based_metric is not None:
@@ -678,7 +680,6 @@ class BaseRollinRolloutDecoder(SeqDecoder):
             raise ConfigurationError(f"{self._scheduled_sampling_type} is not a valid scheduled sampling type.")
 
         self._ss_ratio(self._scheduled_sampling_ratio)
-        self.training_iteration += 1
 
     def rollin(self,
                state: Dict[str, torch.Tensor],
@@ -691,6 +692,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                truncate_at_end_all: bool = False,
                rollin_mode: str = None,
               ):
+        self.training_iteration += 1
 
         # We cannot make a class variable as default, so making default value
         # as None and in case it is None, setting it to num_classes.
@@ -735,6 +737,68 @@ class BaseRollinRolloutDecoder(SeqDecoder):
             "class_log_probabilities": log_probabilities,
         }
         return output_dict
+
+    def rollin_parallel(self, 
+                        state: Dict[str, torch.Tensor],
+                        start_predictions: torch.LongTensor,
+                        rollin_steps: int,
+                        target_tokens: Dict[str, torch.LongTensor] = None,
+                        beam_size: int = 1,
+                        per_node_beam_size: int = None,
+                        sampled: bool = False,
+                        truncate_at_end_all: bool = False,
+                        rollin_mode: str = None,
+                    ):
+        assert self._decoder_net.decodes_parallel, \
+            "Rollin Parallel is only applicable for transformer style decoders" + \
+            "that decode whole sequence in parallel."
+        
+        assert not rollin_mode or rollin_mode == "learned", \
+            "Parallel Decoding only works when following " + \
+            "teacher forcing rollin policy (rollin_mode='learned')."
+
+        assert self._scheduled_sampling_ratio == 0, \
+            "For learned rollin mode, scheduled sampling ratio should always be 0."
+
+        self.training_iteration += 1
+
+        # shape: (batch_size, max_input_sequence_length, encoder_output_dim)
+        encoder_outputs = state["encoder_outputs"]
+
+        # shape: (batch_size, max_input_sequence_length)
+        source_mask = state["source_mask"]
+
+        # shape: (batch_size, max_target_sequence_length)
+        targets = util.get_token_ids_from_text_field_tensors(target_tokens)
+
+        # Prepare embeddings for targets. They will be used as gold embeddings during decoder training
+        # shape: (batch_size, max_target_sequence_length, embedding_dim)
+        target_embedding = self.target_embedder(targets)
+
+        # shape: (batch_size, max_target_batch_sequence_length)
+        target_mask = util.get_text_field_mask(target_tokens)
+
+        _, decoder_output = self._decoder_net(
+            previous_state=state,
+            previous_steps_predictions=target_embedding[:, :-1, :],
+            encoder_outputs=encoder_outputs,
+            source_mask=source_mask,
+            previous_steps_mask=target_mask[:, :-1],
+        )
+
+        # shape: (group_size, max_target_sequence_length, num_classes)
+        logits = self._output_projection_layer(decoder_output)
+
+        # Unsqueeze logit to add beam size dimension.
+        logits = logits.unsqueeze(dim=1)
+
+        log_probabilities, step_predictions = torch.max(logits, dim=-1)
+
+        return {
+            "predictions": step_predictions,
+            "logits": logits,
+            "class_log_probabilities": log_probabilities,
+        }
 
     def rollout(self,
                 state: Dict[str, torch.Tensor],

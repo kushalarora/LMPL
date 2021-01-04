@@ -97,8 +97,9 @@ class LMPLAutoRegressiveSeqDecoder(BaseRollinRolloutDecoder):
 
                  sample_rollouts: bool = False,
                  beam_search_sampling_temperature: float = 1.,
-                 top_k=0, 
-                 top_p=0,
+                 top_k:int = 0, 
+                 top_p:float = 0,
+                 eval_beam_size: int = 1,
                  detokenizer: DeTokenizer = default_tokenizer,
                  tensor_based_metric: Metric = None,
                  tensor_based_metric_mask: Metric = None,
@@ -134,6 +135,7 @@ class LMPLAutoRegressiveSeqDecoder(BaseRollinRolloutDecoder):
             beam_search_sampling_temperature=beam_search_sampling_temperature,
             top_k=top_k,
             top_p=top_p,
+            eval_beam_size=eval_beam_size,
             detokenizer=detokenizer,
             tensor_based_metric=tensor_based_metric,
             tensor_based_metric_mask=tensor_based_metric_mask,
@@ -148,8 +150,14 @@ class LMPLAutoRegressiveSeqDecoder(BaseRollinRolloutDecoder):
                      ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
         rollin_output_dict: Dict[str, torch.Tensor] = {}
         rollout_output_dict_iter: Iterable[Dict[str, torch.Tensor]] = None
-
-        rollin_output_dict.update(self.rollin(state,
+        
+        if self._decoder_net.decodes_parallel:
+            rollin_output_dict.update(self.rollin_parallel(state,
+                                                            start_predictions,
+                                                            rollin_steps=num_decoding_steps,
+                                                            target_tokens=target_tokens,))        
+        else:
+            rollin_output_dict.update(self.rollin(state,
                                                 start_predictions,
                                                 rollin_steps=num_decoding_steps,
                                                 target_tokens=target_tokens,))
