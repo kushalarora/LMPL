@@ -117,3 +117,4 @@ slurm-*
 */*logs/*
 */*results/*
 comet_exp/
+allennlp_optuna.db
