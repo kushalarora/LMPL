@@ -61,6 +61,7 @@ class Seq2SeqDatasetReader(DatasetReader):
         delimiter: str = "\t",
         source_max_tokens: Optional[int] = None,
         target_max_tokens: Optional[int] = None,
+        source_to_target_len_max_ratio: Optional[float] = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -72,14 +73,16 @@ class Seq2SeqDatasetReader(DatasetReader):
         self._delimiter = delimiter
         self._source_max_tokens = source_max_tokens
         self._target_max_tokens = target_max_tokens
+        self._source_to_target_len_max_ratio = source_to_target_len_max_ratio
         self._source_ignored = 0
         self._target_ignored = 0
-
+        self._source_target_ratio_ignored = 0
     @overrides
     def _read(self, file_path):
         # Reset exceeded counts
         self._source_ignored = 0
         self._target_ignored = 0
+        self._source_target_ratio_ignored = 0
         with open(cached_path(file_path), "r") as data_file:
             logger.info("Reading instances from lines in file at: %s", file_path)
             for line_num, row in enumerate(csv.reader(data_file, delimiter=self._delimiter)):
@@ -99,22 +102,31 @@ class Seq2SeqDatasetReader(DatasetReader):
                     if self._target_max_tokens and len(tokenized_target) > self._target_max_tokens:
                         self._target_ignored += 1
                         continue
+                if self._source_to_target_len_max_ratio is not None and \
+                    len(tokenized_target)/len(tokenized_source) > self._source_to_target_len_max_ratio:
+                    self._source_target_ratio_ignored += 1
+                    continue
 
                 yield self.text_to_instance(source_sequence, target_sequence)
 
         if self._source_max_tokens and self._source_ignored:
             logger.info(
-                "In %d instances, the source token length exceeded the max limit (%d) and were truncated.",
+                "In %d instances, the source token length exceeded the max limit (%d) and were removed.",
                 self._source_ignored,
                 self._source_max_tokens,
             )
         if self._target_max_tokens and self._target_ignored:
             logger.info(
-                "In %d instances, the target token length exceeded the max limit (%d) and were truncated.",
+                "In %d instances, the target token length exceeded the max limit (%d) and were removed.",
                 self._target_ignored,
                 self._target_max_tokens,
             )
-
+        if self._source_to_target_len_max_ratio and self._source_target_ratio_ignored:
+            logger.info(
+                "In %d instances, the target/source  length ratio exceeded the max limit (%.2f) and were removed.",
+                self._source_target_ratio_ignored,
+                self._source_to_target_len_max_ratio,
+            )
     @overrides
     def text_to_instance(
         self, source_string: str, target_string: str = None
