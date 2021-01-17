@@ -1,6 +1,6 @@
 wandb
 fairseq==0.9.0
 python-Levenshtein==0.12.0
-allennlp==v1.1.0
-allennlp-models==v1.1.0
+allennlp==1.3.0
+allennlp-models==1.3.0
 allennlp-optuna==0.1.3

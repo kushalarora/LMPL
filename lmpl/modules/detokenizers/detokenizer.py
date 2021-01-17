@@ -1,7 +1,6 @@
 from typing import List
 
 from allennlp.common import Registrable
-from allennlp.data.tokenizers.token import Token
 
 
 class DeTokenizer(Registrable):

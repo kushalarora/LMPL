@@ -12,8 +12,6 @@ from allennlp.data.token_indexers.token_indexer import TokenIndexer
 from allennlp.data.tokenizers.whitespace_tokenizer import WhitespaceTokenizer
 from allennlp.data.tokenizers.tokenizer import Tokenizer
 
-from transformers.tokenization_gpt2 import GPT2TokenizerFast
-
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 
