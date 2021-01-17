@@ -187,7 +187,9 @@ class BaseRollinRolloutDecoder(SeqDecoder):
 
         if self.target_embedder.get_output_dim() != self._decoder_net.target_embedding_dim:
             raise ConfigurationError(
-                "Target Embedder output_dim doesn't match decoder module's input."
+                "Target Embedder output_dim doesn't match decoder module's input." + 
+                    f"target_embedder_dim: {self.target_embedder.get_output_dim()}, " + 
+                    f"decoder input dim: {self._decoder_net.target_embedding_dim}."
             )
 
         self._ss_ratio = Average()
@@ -205,7 +207,8 @@ class BaseRollinRolloutDecoder(SeqDecoder):
         if tie_output_embedding:
             if self._output_projection_layer.weight.shape != self.target_embedder.weight.shape:
                 raise ConfigurationError(
-                    "Can't tie embeddings with output linear layer, due to shape mismatch"
+                    f"Can't tie embeddings with output linear layer, due to shape mismatch. " + 
+                    f"{self._output_projection_layer.weight.shape} and {self.target_embedder.weight.shape}"
                 )
             self._output_projection_layer.weight = self.target_embedder.weight
 
