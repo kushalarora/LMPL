@@ -20,6 +20,13 @@ local stringToBool(s) =
   else if s == "false" || s == '' || s == null then false
   else error "invalid boolean: " + std.manifestJson(s);
 
+
+local NUM_GPUS_VAR = std.parseJson(std.extVar("NUM_GPUS"));
+local NUM_GPUS = if NUM_GPUS_VAR != null then NUM_GPUS_VAR else 1;
+
+local DISTRIBUTED_VAR = std.parseJson(std.extVar("DISTRIBUTED"));
+local DISTRIBUTED = if DISTRIBUTED_VAR == "true" || DISTRIBUTED_VAR then "true" else "false";
+
 {
   seq2seq_dataset_reader(target_max_tokens=175, 
                                   source_max_tokens=175, 
@@ -29,12 +36,12 @@ local stringToBool(s) =
       "source_token_indexers": {
         "tokens": {
           "type": "single_id",
-          "namespace": "source_tokens"
+          "namespace": "tokens"
         }
       },
       "target_token_indexers": {
         "tokens": {
-          "namespace": "target_tokens"
+          "namespace": "tokens"
         }
       },
       // "cache_directory": "data/iwslt/",
@@ -52,22 +59,22 @@ local stringToBool(s) =
   lstm_cell_decoder_net(decoder_hidden_dim=256, 
                             encoder_hidden_dim=128,
                             decoder_embedding_dim=128,
-                            bidirection_input=true,
+                            bidirectional_input=true,
                             num_decoder_layers=1,
                             dropout_ratio=0.1)::
     {
       "type": "lmpl_lstm_cell",
       "decoding_dim": decoder_hidden_dim, 
       "target_embedding_dim": decoder_embedding_dim,
-      "bidirectional_input": bidirection_input,
+      "bidirectional_input": bidirectional_input,
       "num_decoder_layers": num_decoder_layers,
       "dropout": dropout_ratio,
       // TODO: Allow attention as a functional argument.
       "attention": {
-          "type": "bilinear",
-          "vector_dim": decoder_hidden_dim,
-          "matrix_dim": encoder_hidden_dim,
-          // "type": "dot_product",
+          // "type": "bilinear",
+          // "vector_dim": decoder_hidden_dim,
+          // "matrix_dim": encoder_hidden_dim,
+          "type": "dot_product",
       },
     },
 
@@ -179,22 +186,31 @@ local stringToBool(s) =
                   loss_criterion, optimizer, batch_size,  num_epochs,
                   decoder_embedding_dim=128, encoder_input_dim=128, 
                   max_decoding_steps=175, initializer= null, learning_rate_scheduler=null,
-                  patience=5, distributed="false", ngpus=1, grad_clipping=5.0, epoch_callbacks=[], use_amp=false,
-                  encoder_vocab_namespace='source_tokens', decoder_vocab_namespace='target_tokens',
+                  patience=5, distributed=DISTRIBUTED, ngpus=NUM_GPUS, grad_clipping=5.0, epoch_callbacks=[], use_amp=false,
+                  encoder_vocab_namespace='tokens',
+                  decoder_vocab_namespace='tokens',
                   dropout_ratio = 0.1, eval_beam_size=5, 
                   evaluate_on_test=false, test_path=null,
-                  ) ::
+                  decoder_type="lmpl_auto_regressive_seq_decoder",
+                  decoder_extra_args={},
+                  num_gradient_accumulation_steps=1,
+                  tie_output_embedding=null,
+                  tied_source_embedder_key=false,
+                ) ::
     {
       "dataset_reader": dataset_reader,
       "train_data_path": train_path,
+      "datasets_for_vocab_creation": ["train"],
       "validation_data_path": valid_path,
-      [if test_path != null then "test_data_path"]: test_path,
+      [if evaluate_on_test && test_path != null then "test_data_path"]: test_path,
       "evaluate_on_test": evaluate_on_test,
       "model": {
         "type": "lmpl_composed_lm",
         "use_in_seq2seq_mode": true,
+        "tied_source_embedder_key": tied_source_embedder_key,
         "decoder": {
-            "type": "lmpl_auto_regressive_seq_decoder",
+            "type": decoder_type,
+            [if tie_output_embedding != null then "tie_output_embedding"]: tie_output_embedding,
             "max_decoding_steps": max_decoding_steps,
             "decoder_net": decoder_net,
             "target_embedder": {
@@ -203,12 +219,12 @@ local stringToBool(s) =
             },
             "loss_criterion": loss_criterion,
             "use_in_seq2seq_mode": true, 
-            "target_namespace": "target_tokens",
+            "target_namespace": "tokens",
             "beam_size": 1,
             "use_bleu" : true,
             "dropout": dropout_ratio,
             "eval_beam_size": eval_beam_size,
-        },
+        } + decoder_extra_args,
         "source_embedder": {
           "token_embedders": {
             "tokens": {
@@ -226,7 +242,7 @@ local stringToBool(s) =
         "batch_sampler": {
           "type": "bucket",
           "padding_noise": 0.0,
-          "batch_size": 64,
+          "batch_size": batch_size,
           "sorting_keys": ["target_tokens"],
         },
         "num_workers": 1,
@@ -245,6 +261,8 @@ local stringToBool(s) =
           "num_serialized_models_to_keep": 5,
         },
         "epoch_callbacks": epoch_callbacks,
+        "num_gradient_accumulation_steps": num_gradient_accumulation_steps,
+
       },
       [if stringToBool(distributed) then "distributed"]:   { "cuda_devices": gpus(ngpus),},
     },
