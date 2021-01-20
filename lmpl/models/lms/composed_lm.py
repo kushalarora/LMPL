@@ -4,6 +4,8 @@ import torch
 from overrides import overrides
 
 from allennlp.common.checks import ConfigurationError
+from allennlp.common.util import START_SYMBOL, END_SYMBOL
+
 from allennlp.data.vocabulary import Vocabulary
 from allennlp.models.model import Model
 from allennlp.modules import TextFieldEmbedder, Seq2SeqEncoder, Embedding
@@ -11,7 +13,10 @@ from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
 from allennlp.nn import util, InitializerApplicator, RegularizerApplicator
 
 from allennlp_models.generation.modules.seq_decoders import SeqDecoder
+from lmpl.modules.detokenizers.detokenizer import DeTokenizer, default_tokenizer
 
+from lmpl.modules.utils import decode_tokens
+import random
 
 @Model.register("lmpl_composed_lm")
 class ComposedLMBase(Model):
@@ -55,8 +60,14 @@ class ComposedLMBase(Model):
         regularizer: Optional[RegularizerApplicator] = None,
 
         source_embedder: TextFieldEmbedder = None,
+        source_namespace: str = "tokens",
+        source_add_start_token: bool = False,
+        source_start_token: str = START_SYMBOL,
+        source_end_token: str = END_SYMBOL,
         encoder: Seq2SeqEncoder = None,
         tied_source_embedder_key: Optional[str] = None,
+        detokenizer: DeTokenizer = default_tokenizer,
+        log_output_every_iteration: int = 100,
     ) -> None:
 
         super().__init__(vocab, regularizer)
@@ -68,8 +79,21 @@ class ComposedLMBase(Model):
         self._decoder = decoder
         
         self._source_embedder = source_embedder
+        self._source_namespace = source_namespace
         self._encoder = encoder
 
+        self._vocab = vocab
+        self._detokenizer = detokenizer
+
+        self._source_add_start_token = source_add_start_token
+        self._source_end_token = source_end_token
+
+        self._source_start_index = None
+        if source_add_start_token:
+            self._source_start_index = self._vocab.get_token_index(source_start_token, self._source_namespace)
+        self._source_end_index = self._vocab.get_token_index(source_end_token, self._source_namespace)
+
+        self._log_output_every_iteration = log_output_every_iteration
         if self._seq2seq_mode:
             if self._encoder.get_output_dim() != self._decoder.get_output_dim():
                 raise ConfigurationError(
@@ -126,13 +150,40 @@ class ComposedLMBase(Model):
         Dict[str, torch.Tensor]
             The output tensors from the decoder.
         """
+        self.batch_number += 1
         state:  Dict[str, torch.Tensor] = {
                             "epoch": self.epoch,
                             "batch_number": self.batch_number,
                            }
         if self._seq2seq_mode:
             state.update(self._encode(source_tokens))
-        return self._decoder(state, target_tokens)
+        output_dict = self._decoder(state, target_tokens)
+
+        if self._seq2seq_mode:
+            source_indexes=util.get_token_ids_from_text_field_tensors(source_tokens)
+            decoded_sources = decode_tokens(vocab=self._vocab, 
+                                end_index=self._source_end_index,
+                                start_index=self._source_start_index,
+                                batch_predicted_indices=source_indexes,
+                                truncate=True,)
+            output_dict['decoded_sources'] = decoded_sources
+            output_dict['detokenized_sources'] = self._detokenizer(
+                                                    [source[0] for source in decoded_sources])
+        
+        output_dict["detokenized_predictions"] = \
+                [self._detokenizer(predictions)
+                    for predictions in output_dict["decoded_predictions"]]
+        output_dict["detokenized_targets"] = self._detokenizer(
+                        [target[0] for target in output_dict['decoded_targets']])
+        
+        if self.batch_number % self._log_output_every_iteration == 0:
+            print()
+            if self._seq2seq_mode:
+                print(f"Source::  {output_dict['detokenized_sources'][0]}")
+            print(f"Target::  {output_dict['detokenized_targets'][0]}")
+            print(f"Top Prediction::  {output_dict['detokenized_predictions'][0][0]}")
+
+        return output_dict
 
     @overrides
     def make_output_human_readable(self, output_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:

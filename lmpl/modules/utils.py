@@ -1,5 +1,8 @@
 import torch 
 import torch.nn.functional as F 
+import numpy 
+
+from allennlp.data.vocabulary import Vocabulary
 
 def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-1e30):
     """ Filter a distribution of logits using top-k and/or nucleus (top-p) filtering
@@ -41,3 +44,38 @@ def expand_tensor(tensor: torch.Tensor, num_tokens_to_rollout):
     return tensor.unsqueeze(1)\
             .expand(batch_size, num_tokens_to_rollout, *non_batch_dims)\
             .reshape(batch_size * num_tokens_to_rollout, *non_batch_dims)
+
+def decode_tokens(batch_predicted_indices: torch.Tensor,
+                  vocab: Vocabulary,
+                  end_index: int, 
+                  start_index: int = None,
+                  vocab_namespace:str ='tokens',
+                  truncate: bool = False):
+    if not isinstance(batch_predicted_indices, numpy.ndarray):
+        batch_predicted_indices = batch_predicted_indices.detach().cpu().numpy()
+
+    all_predicted_tokens = []
+    for predicted_indices in batch_predicted_indices:
+        # Beam search gives us the top k results for each source sentence in the batch
+        # but we just want the single best.
+        
+        if len(predicted_indices.shape) == 1:
+            predicted_indices = numpy.expand_dims(predicted_indices, axis=0)
+
+        instance_predicted_tokens = []    
+        for indices in predicted_indices:
+            # We add start token to the predictions.
+            # In case it is present at position 0, remove it.
+            if start_index is not None and start_index == indices[0]:
+                indices = indices[1:]
+
+            indices = list(indices)
+            # Collect indices till the first end_symbol
+            if truncate and end_index in indices:
+                indices = indices[:indices.index(end_index)]
+            predicted_tokens = [vocab.get_token_from_index(x, namespace=vocab_namespace)
+                                for x in indices]
+
+            instance_predicted_tokens.append(predicted_tokens)
+        all_predicted_tokens.append(instance_predicted_tokens)
+    return all_predicted_tokens

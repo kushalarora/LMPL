@@ -25,7 +25,6 @@ from allennlp_models.generation.modules.seq_decoders import SeqDecoder
 
 from lmpl.modules.cost_functions.cost_function import CostFunction
 from lmpl.modules.criterions.base_loss_criterion import LossCriterion
-from lmpl.modules.detokenizers.detokenizer import DeTokenizer, default_tokenizer
 
 from lmpl.modules.decoders import BaseRollinRolloutDecoder
 
@@ -100,7 +99,6 @@ class LMPLAutoRegressiveSeqDecoder(BaseRollinRolloutDecoder):
                  top_k:int = 0, 
                  top_p:float = 0,
                  eval_beam_size: int = 1,
-                 detokenizer: DeTokenizer = default_tokenizer,
                  tensor_based_metric: Metric = None,
                  tensor_based_metric_mask: Metric = None,
                  token_based_metric: Metric = None,
@@ -136,7 +134,6 @@ class LMPLAutoRegressiveSeqDecoder(BaseRollinRolloutDecoder):
             top_k=top_k,
             top_p=top_p,
             eval_beam_size=eval_beam_size,
-            detokenizer=detokenizer,
             tensor_based_metric=tensor_based_metric,
             tensor_based_metric_mask=tensor_based_metric_mask,
             token_based_metric=token_based_metric,

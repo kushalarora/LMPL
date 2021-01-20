@@ -28,13 +28,11 @@ from lmpl.metrics.hamming_loss import HammingLoss
 from lmpl.models.sampled_beam_search import SampledBeamSearch
 from lmpl.modules.cost_functions.cost_function import CostFunction
 from lmpl.modules.criterions import LossCriterion, MaximumLikelihoodLossCriterion
-from lmpl.modules.utils import top_k_top_p_filtering
-from lmpl.modules.detokenizers.detokenizer import DeTokenizer, default_tokenizer
+from lmpl.modules.utils import top_k_top_p_filtering, decode_tokens
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 RolloutMixingProbFuncType = Callable[[], torch.Tensor]
-DeTokenizerType = Callable[[List[List[str]]], List[str]]
 
 RollinPolicyType = Callable[[int, torch.LongTensor], torch.LongTensor]
 # By default, if no rollin_policy is specified, just return the last prediction.
@@ -102,7 +100,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                  rollout_mode: str = 'learned',
 
                  dropout: float = None,
-                 start_token: str =START_SYMBOL,
+                 start_token: str = START_SYMBOL,
                  end_token: str = END_SYMBOL,
                  num_decoder_layers: int = 1,
                  mask_pad_and_oov: bool = False,
@@ -117,7 +115,6 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                  beam_search_sampling_temperature: float = 1.,
                  top_k=0, 
                  top_p=0,
-                 detokenizer: DeTokenizer = default_tokenizer,
                  tensor_based_metric: Metric = None,
                  tensor_based_metric_mask: Metric = None,
                  token_based_metric: Metric = None,
@@ -214,8 +211,6 @@ class BaseRollinRolloutDecoder(SeqDecoder):
 
         self._loss_criterion = loss_criterion
 
-        self._detokenizer = detokenizer
-
         self._top_k = top_k
         self._top_p = top_p
         self._eval_beam_size = eval_beam_size
@@ -227,6 +222,11 @@ class BaseRollinRolloutDecoder(SeqDecoder):
         self._token_based_metric = token_based_metric
         self._tensor_based_metric_mask = tensor_based_metric_mask
         
+        self._decode_tokens = partial(decode_tokens, 
+                                    vocab=self._vocab,
+                                    start_index=self._start_index,
+                                    end_index=self._end_index)
+                                    
     def get_output_dim(self):
         return self._decoder_net.get_output_dim()
 
@@ -543,6 +543,16 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                                                 target_tokens=target_tokens)
 
             output_dict.update(decoder_output_dict)
+            predictions = decoder_output_dict['predictions']
+            predicted_tokens = self._decode_tokens(predictions,
+                                                    vocab_namespace=self._target_namespace,
+                                                    truncate=True)
+            output_dict["decoded_predictions"] = predicted_tokens
+
+            decoded_targets = self._decode_tokens(targets,
+                                    vocab_namespace=self._target_namespace,
+                                    truncate=True)
+            output_dict["decoded_targets"] = decoded_targets
 
             output_dict.update(self._loss_criterion(
                                             rollin_output_dict=rollin_dict, 
@@ -577,10 +587,15 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                                         truncate_at_end_all=False)
 
             output_dict.update(rollout_output_dict)
+
+            predictions = decoder_output_dict['predictions']
+            predicted_tokens = self._decode_tokens(predictions,
+                                                vocab_namespace=self._target_namespace,
+                                                truncate=True)
+            output_dict["decoded_predictions"] = predicted_tokens
             decoded_predictions = [predictions[0] \
-                                    for predictions in rollout_output_dict["decoded_predictions"]]
-            output_dict["detokenized_predictions"] = \
-                            self._detokenizer(decoded_predictions)
+                                    for predictions in output_dict["decoded_predictions"]]
+
 
             # shape (predictions): (batch_size, beam_size, num_decoding_steps)
             predictions = rollout_output_dict['predictions']
@@ -620,38 +635,6 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                             gold_targets=decoded_targets,
                         )
         return output_dict
-
-    def _decode_tokens(self,
-                       batch_predicted_indices: torch.Tensor,
-                       vocab_namespace:str ='tokens',
-                       truncate=False) -> List[str]:
-        if not isinstance(batch_predicted_indices, numpy.ndarray):
-            batch_predicted_indices = batch_predicted_indices.detach().cpu().numpy()
-        all_predicted_tokens = []
-        for predicted_indices in batch_predicted_indices:
-            # Beam search gives us the top k results for each source sentence in the batch
-            # but we just want the single best.
-            
-            if len(predicted_indices.shape) == 1:
-                predicted_indices = numpy.expand_dims(predicted_indices, axis=0)
-
-            instance_predicted_tokens = []    
-            for indices in predicted_indices:
-                # We add start token to the predictions.
-                # In case it is present at position 0, remove it.
-                if self._start_index == indices[0]:
-                    indices = indices[1:]
-
-                indices = list(indices)
-                # Collect indices till the first end_symbol
-                if truncate and self._end_index in indices:
-                    indices = indices[:indices.index(self._end_index)]
-                predicted_tokens = [self._vocab.get_token_from_index(x, namespace=vocab_namespace)
-                                    for x in indices]
-
-                instance_predicted_tokens.append(predicted_tokens)
-            all_predicted_tokens.append(instance_predicted_tokens)
-        return all_predicted_tokens
 
     @overrides
     def post_process(self, output_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
@@ -879,18 +862,13 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                                                 .reshape(batch_size * beam_size, -1)) \
                                         .reshape(batch_size, beam_size, -1)
 
-        predicted_tokens = self._decode_tokens(step_predictions,
-                                        vocab_namespace=self._target_namespace,
-                                        truncate=True)
         output_dict = {
             "predictions": step_predictions,
             "prediction_masks": step_prediction_masks,
-            "decoded_predictions": predicted_tokens,
             "logits": logits,
             "class_log_probabilities": log_probabilities,
         }
 
-        decoded_targets = None
         step_targets = None
         step_target_masks = None
         if target_tokens is not None:
@@ -898,15 +876,12 @@ class BaseRollinRolloutDecoder(SeqDecoder):
             if target_prefixes is not None:
                 prefixes_length = target_prefixes.size(1)
                 step_targets = torch.cat([target_prefixes, step_targets], dim=-1)
-                decoded_targets = self._decode_tokens(step_targets,
-                                        vocab_namespace=self._target_namespace,
-                                        truncate=True)
+
             step_target_masks = util.get_text_field_mask({'tokens': {'tokens': step_targets}})
             
             output_dict.update({
                 "targets": step_targets,
                 "target_masks": step_target_masks,
-                "decoded_targets": decoded_targets,
             })
         return output_dict
 

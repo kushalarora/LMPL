@@ -19,7 +19,6 @@ from allennlp_models.generation.modules.seq_decoders import SeqDecoder
 
 from lmpl.modules.decoders.auto_regressive_decoder import BaseRollinRolloutDecoder
 from lmpl.modules.criterions import LossCriterion
-from lmpl.modules.detokenizers.detokenizer import DeTokenizer, default_tokenizer
 from lmpl.modules.utils import expand_tensor
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
@@ -143,7 +142,6 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                  top_k=0, 
                  top_p=0,
                  eval_beam_size: int = 1,
-                 detokenizer: DeTokenizer = default_tokenizer,
                  tensor_based_metric: Metric = None,
                  tensor_based_metric_mask: Metric = None,
                  token_based_metric: Metric = None,
@@ -204,7 +202,6 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
             top_k=top_k,
             top_p=top_p,
             eval_beam_size=eval_beam_size,
-            detokenizer=detokenizer,
             tensor_based_metric=tensor_based_metric,
             tensor_based_metric_mask=tensor_based_metric_mask,
             token_based_metric=token_based_metric,
