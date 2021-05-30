@@ -1,7 +1,8 @@
+import sys
 def join_src_tgt(split):
-    with open(f'{split}.de') as fsrc, \
-        open(f'{split}.en') as ftgt, \
-        open(f'{split}.tsv', 'w') as fout:
+    with open(f'{sys.argv[1]}/iwslt14.tokenized.de-en/{split}.de') as fsrc, \
+        open(f'{sys.argv[1]}/iwslt14.tokenized.de-en/{split}.en') as ftgt, \
+        open(f'{sys.argv[1]}/{split}.tsv', 'w') as fout:
         
         srcs = [line.strip() for line in fsrc] 
         tgts = [line.strip() for line in ftgt]

@@ -20,7 +20,8 @@ OUT_DIR=${HOME}/scratch/lmpl/results/${2}/$run_id/
 export DISTRIBUTED=${DISTRIBUTED:-"false"};
 export NUM_GPUS=${NUM_GPUS:-1};
 export DEBUG=${DEBUG:-"true"};
+export BATCH_SIZE=${BATCH_SIZE:-60};
 
- ${HOME}/.local/bin/tensorboard --logdir=${OUT_DIR}/log --host=0.0.0.0 &
+tensorboard --logdir=${OUT_DIR}/log --host=0.0.0.0 &
 
 allennlp train ${1} -s ${OUT_DIR} --include-package lmpl

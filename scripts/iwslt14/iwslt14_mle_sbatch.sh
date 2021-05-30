@@ -2,7 +2,6 @@
 
 set -eux
 
-module load httpproxy
 export DISTRIBUTED="true";
 export NUM_GPUS=4;
 export DEBUG="false";

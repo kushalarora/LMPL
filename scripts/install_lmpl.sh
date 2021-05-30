@@ -1,6 +1,5 @@
 set -eux
-
-virtualenv ${HOME}/envs/lmpl;
+python -m venv ${HOME}/envs/lmpl;
 
 source ${HOME}/envs/lmpl/bin/activate;
 
