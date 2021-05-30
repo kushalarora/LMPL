@@ -17,9 +17,6 @@ local DISTRIBUTED_VAR = std.parseJson(std.extVar("DISTRIBUTED"));
 local DISTRIBUTED = if DISTRIBUTED_VAR == "true" || DISTRIBUTED_VAR then "true" else "false";
 
 {
-  gpus(ngpu)::
-    if ngpu > 1 then std.range(0, ngpu - 1)
-    else error "invalid option: " + std.manifestJson(ngpu),
 
   stringToBool(s)::
     if s == "true" then true
@@ -266,6 +263,8 @@ local DISTRIBUTED = if DISTRIBUTED_VAR == "true" || DISTRIBUTED_VAR then "true" 
         "num_gradient_accumulation_steps": num_gradient_accumulation_steps,
 
       },
-      [if self.stringToBool(distributed) then "distributed"]:   { "cuda_devices": self.gpus(ngpus),},
+      [if self.stringToBool(distributed) then "distributed"]:   { 
+	"cuda_devices": std.range(0, ngpus - 1),
+      },
     },
 }

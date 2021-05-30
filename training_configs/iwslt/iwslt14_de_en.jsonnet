@@ -12,7 +12,7 @@ local test_path = "data/iwslt/test_*.tsv";
 
 
 local decoder_dropout_ratio = 0.4;
-// local decoder_dropout_ratio = std.parseJson(std.extVar('weight_decay'));;
+// local decoder_dropout_ratio = std.parseJson(std.extVar('weight_decay'));
 
 local num_encoder_layers = 2;
 local num_decoder_layers = 2;
@@ -25,7 +25,8 @@ local decoder_embedding_dim = 512;
 local encoder_input_dim = 512;
 local decoder_hidden_dim = 512;
 
-local batch_size = 60;
+local batch_size = std.parseJson(std.extVar('BATCH_SIZE'));
+// local batch_size = 60; 
 local num_epochs = 80;
 
 local ngpus = std.parseJson(std.extVar("NUM_GPUS"));
