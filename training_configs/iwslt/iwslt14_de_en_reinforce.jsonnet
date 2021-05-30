@@ -92,6 +92,9 @@ local decoder_extra_args = {
           "do_max_rollout_steps": false,
       };
 
+local model_extra_args = {
+  "log_output_every_iteration": 1000,
+};
 base.seq2seq_config(
       train_path=train_path, valid_path=valid_path, test_path=test_path,
       dataset_reader=dataset_reader, encoder=encoder, decoder_net=decoder_net, decoder_extra_args=decoder_extra_args, 

@@ -194,6 +194,7 @@ local DISTRIBUTED = if DISTRIBUTED_VAR == "true" || DISTRIBUTED_VAR then "true" 
                   evaluate_on_test=false, test_path=null,
                   decoder_type="lmpl_auto_regressive_seq_decoder",
                   decoder_extra_args={},
+                  model_extra_args={},
                   num_gradient_accumulation_steps=1,
                   tie_output_embedding=null,
                   tied_source_embedder_key=false,
@@ -238,7 +239,7 @@ local DISTRIBUTED = if DISTRIBUTED_VAR == "true" || DISTRIBUTED_VAR then "true" 
         },
         "encoder": encoder,
         [if initializer != null then "initializer"]: initializer,
-      },
+      } + model_extra_args,
       "data_loader": {
         "batch_sampler": {
           "type": "bucket",
