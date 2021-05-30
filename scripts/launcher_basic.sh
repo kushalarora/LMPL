@@ -12,8 +12,16 @@
 #SBATCH -e logs/slurm-%x-%j.out
 ###########################
 
-set -eux
+set -ex
 module load httpproxy
-module load cuda/10.2
-source ~/scratch/envs/lmpl/bin/activate 
-$@
+source ${HOME}/envs/lmpl/bin/activate 
+
+export run_id=$(date '+%Y_%m_%d_%H_%M')
+OUT_DIR=${HOME}/scratch/lmpl/results/${2}/$run_id/
+export DISTRIBUTED=${DISTRIBUTED:-"false"};
+export NUM_GPUS=${NUM_GPUS:-1};
+export DEBUG=${DEBUG:-"true"};
+
+ ${HOME}/.local/bin/tensorboard --logdir=${OUT_DIR}/log --host=0.0.0.0 &
+
+allennlp train ${1} -s ${OUT_DIR} --include-package lmpl

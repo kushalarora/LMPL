@@ -167,10 +167,11 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                  include_last: bool = False,
                  max_num_contexts: int = sys.maxsize,
                  min_num_contexts: int = 2,
-                 num_random_tokens_to_add = 0,
-                 add_noise_to_sampling = True,
-                 max_sampling_noise = 1e-5,
-                 sampling_temperature=10,
+                 num_random_tokens_to_add: int = 0,
+                 add_noise_to_sampling: bool = True,
+                 max_sampling_noise: float = 1e-5,
+                 sampling_temperature: int =10,
+                 extend_targets_by_1: bool = True,
                 ) -> None:
         super().__init__(
             vocab=vocab,
@@ -249,6 +250,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         self._add_noise_to_sampling = add_noise_to_sampling
         self._max_sampling_noise = max_sampling_noise
         self._sampling_temperature = sampling_temperature
+        self._extend_targets_by_1 = extend_targets_by_1
 
     def get_contexts_to_rollout(self,
                                 context_iterator:Iterable[int], 
@@ -338,8 +340,12 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
 
         # step_logits: (batch_size, vocab_size)
         step_logits = rollin_logits[:, step - 1, :].clone().detach()
-        step_logits[torch.isnan(step_logits)] = -1e30
-        
+        try:
+            step_logits[torch.isnan(step_logits)] = torch.finfo(step_logits.dtype).min
+        except:
+            import pdb; pdb.set_trace()
+            pass
+
         # step_unnorm_probabilities: (batch_size, vocab_size)
         step_unnorm_probabilities = F.softmax(step_logits/self._sampling_temperature, dim=-1)
 
@@ -422,7 +428,9 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                          num_decoding_steps: int, 
                          step: int, ):
         # TODO #19 (@kushalarora) Verify if we need do_max_rollout_steps.
-        rollout_steps = num_decoding_steps + 1 - step
+        rollout_steps = num_decoding_steps - step
+        if self._extend_targets_by_1:
+           rollout_steps += 1
         if self._do_max_rollout_steps:
             # There might be a case where max_decoding_steps < num_decoding_steps, in this 
             # case we want to rollout beyond max_decoding_steps
@@ -544,7 +552,6 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                                          start_predictions=start_predictions,
                                          rollin_steps=num_decoding_steps,
                                          target_tokens=target_tokens)
-
         # decoder_context: (batch_size, num_rollin_steps,  hidden_state_size)
         # decoder_hidden: (batch_size, num_rollin_steps, hidden_state_size)
         rollin_decoder_context = state['decoder_accumulated_hiddens']
@@ -570,7 +577,8 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         targets = util.get_token_ids_from_text_field_tensors(target_tokens)
 
         # TODO #17 Verify if target_plus_1 logic is essential for SEARNN, if not, get rid of it. (@kushalarora)
-        targets = extend_targets_by_1(targets)
+        if self._extend_targets_by_1:
+            targets = extend_targets_by_1(targets)
 
         rollout_output_dict_iter = self.get_rollout_iterator(
                                                 rollout_contexts=rollout_contexts,

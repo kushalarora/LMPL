@@ -862,13 +862,18 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                                                 .reshape(batch_size * beam_size, -1)) \
                                         .reshape(batch_size, beam_size, -1)
 
+        predicted_tokens = self._decode_tokens(step_predictions,
+                                        vocab_namespace=self._target_namespace,
+                                        truncate=True)
         output_dict = {
             "predictions": step_predictions,
             "prediction_masks": step_prediction_masks,
+            "decoded_predictions": predicted_tokens,
             "logits": logits,
             "class_log_probabilities": log_probabilities,
         }
 
+        decoded_targets = None
         step_targets = None
         step_target_masks = None
         if target_tokens is not None:
@@ -876,12 +881,16 @@ class BaseRollinRolloutDecoder(SeqDecoder):
             if target_prefixes is not None:
                 prefixes_length = target_prefixes.size(1)
                 step_targets = torch.cat([target_prefixes, step_targets], dim=-1)
-
+            
+            decoded_targets = self._decode_tokens(step_targets,
+                                    vocab_namespace=self._target_namespace,
+                                    truncate=True)
             step_target_masks = util.get_text_field_mask({'tokens': {'tokens': step_targets}})
             
             output_dict.update({
                 "targets": step_targets,
                 "target_masks": step_target_masks,
+                "decoded_targets": decoded_targets,
             })
         return output_dict
 

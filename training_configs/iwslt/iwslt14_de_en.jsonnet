@@ -28,12 +28,10 @@ local decoder_hidden_dim = 512;
 local batch_size = 60;
 local num_epochs = 80;
 
-local NUM_GPUS = std.parseJson(std.extVar("NUM_GPUS"));
-local ngpus = if NUM_GPUS != null then NUM_GPUS else 1;
+local ngpus = std.parseJson(std.extVar("NUM_GPUS"));
 
-local DISTRIBUTED = std.parseJson(std.extVar("DISTRIBUTED"));
-local distributed = if DISTRIBUTED == "true"  || DISTRIBUTED == true then "true"  else "false";
-
+local debug = base.stringToBool(std.extVar("DEBUG"));
+local distributed = base.stringToBool(std.extVar("DISTRIBUTED"));
 
 local dataset_reader = base.sharded_dataset_reader(base.seq2seq_dataset_reader());
 
@@ -41,14 +39,15 @@ local encoder = base.lstm_encoder(encoder_input_dim=encoder_input_dim,
                                     encoder_hidden_dim=encoder_hidden_dim,
                                     num_encoder_layers=num_encoder_layers,);
 
-local decoder_net = base.lstm_cell_decoder_net(decoder_embedding_dim=decoder_embedding_dim,
-                                                encoder_hidden_dim=encoder_hidden_dim,
-                                                decoder_hidden_dim=decoder_hidden_dim,
-                                                bidirectional_input=true,
-                                                num_decoder_layers=num_decoder_layers,
-                                                dropout_ratio=decoder_dropout_ratio);
+local decoder_net = base.lstm_cell_decoder_net(
+                            decoder_embedding_dim=decoder_embedding_dim,
+                            encoder_hidden_dim=encoder_hidden_dim,
+                            decoder_hidden_dim=decoder_hidden_dim,
+                            bidirectional_input=true,
+                            num_decoder_layers=num_decoder_layers,
+                            dropout_ratio=decoder_dropout_ratio);
 
-local epoch_callbacks = base.wandb_epoch_callback();
+local epoch_callbacks = if !debug then base.wandb_epoch_callback();
 local initializer = base.lstm_initializer();
 
 local learning_rate_scheduler = {

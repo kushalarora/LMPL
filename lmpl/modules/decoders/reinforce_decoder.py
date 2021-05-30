@@ -125,5 +125,6 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
             include_last=include_last,
             max_num_contexts=max_num_contexts,
             min_num_contexts=min_num_contexts,
+            extend_targets_by_1=False,
     )
 

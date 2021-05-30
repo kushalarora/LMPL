@@ -8,17 +8,6 @@ local num_encoder_layers = 2;
 local dropout_ratio = 0.1;
 local lr = std.parseJson(std.extVar('lr'));
 
-local gpus(ngpu) =
-  if ngpu == 1 then [0]
-  else if ngpu == 2 then [0, 1]
-  else if ngpu == 3 then [0, 1, 2]
-  else if ngpu == 4 then [0, 1, 2, 3]
-  else error "invalid option: " + std.manifestJson(ngpu);
-
-local stringToBool(s) =
-  if s == "true" then true
-  else if s == "false" || s == '' || s == null then false
-  else error "invalid boolean: " + std.manifestJson(s);
 
 
 local NUM_GPUS_VAR = std.parseJson(std.extVar("NUM_GPUS"));
@@ -28,6 +17,15 @@ local DISTRIBUTED_VAR = std.parseJson(std.extVar("DISTRIBUTED"));
 local DISTRIBUTED = if DISTRIBUTED_VAR == "true" || DISTRIBUTED_VAR then "true" else "false";
 
 {
+  gpus(ngpu)::
+    if ngpu > 1 then std.range(0, ngpu - 1)
+    else error "invalid option: " + std.manifestJson(ngpu),
+
+  stringToBool(s)::
+    if s == "true" then true
+    else if s == "false" || s == '' || s == null then false
+    else error "invalid boolean: " + std.manifestJson(s),
+
   seq2seq_dataset_reader(target_max_tokens=175, 
                                   source_max_tokens=175, 
                                   source_to_target_len_max_ratio=1.5)::
@@ -181,12 +179,15 @@ local DISTRIBUTED = if DISTRIBUTED_VAR == "true" || DISTRIBUTED_VAR then "true" 
           "sync_tensorboard": sync_tensorboard,
     },],
 
-
+  tensorboard_epoch_callback() ::
+    [{
+          "type": 'tensorboard',
+    },],
   seq2seq_config(train_path, valid_path, dataset_reader, encoder, decoder_net, 
                   loss_criterion, optimizer, batch_size,  num_epochs,
                   decoder_embedding_dim=128, encoder_input_dim=128, 
-                  max_decoding_steps=175, initializer= null, learning_rate_scheduler=null,
-                  patience=5, distributed=DISTRIBUTED, ngpus=NUM_GPUS, grad_clipping=5.0, epoch_callbacks=[], use_amp=false,
+                  max_decoding_steps=175, initializer= null, learning_rate_scheduler=null, beam_size=1,
+                  patience=5, distributed=DISTRIBUTED, ngpus=NUM_GPUS, grad_clipping=5.0, epoch_callbacks=[], use_amp=true,
                   encoder_vocab_namespace='tokens',
                   decoder_vocab_namespace='tokens',
                   dropout_ratio = 0.1, eval_beam_size=5, 
@@ -220,7 +221,7 @@ local DISTRIBUTED = if DISTRIBUTED_VAR == "true" || DISTRIBUTED_VAR then "true" 
             "loss_criterion": loss_criterion,
             "use_in_seq2seq_mode": true, 
             "target_namespace": "tokens",
-            "beam_size": 1,
+            "beam_size": beam_size,
             "use_bleu" : true,
             "dropout": dropout_ratio,
             "eval_beam_size": eval_beam_size,
@@ -245,7 +246,7 @@ local DISTRIBUTED = if DISTRIBUTED_VAR == "true" || DISTRIBUTED_VAR then "true" 
           "batch_size": batch_size,
           "sorting_keys": ["target_tokens"],
         },
-        "num_workers": 1,
+        "num_workers": 0,
         "pin_memory": true,
       },
       "trainer": {
@@ -264,6 +265,6 @@ local DISTRIBUTED = if DISTRIBUTED_VAR == "true" || DISTRIBUTED_VAR then "true" 
         "num_gradient_accumulation_steps": num_gradient_accumulation_steps,
 
       },
-      [if stringToBool(distributed) then "distributed"]:   { "cuda_devices": gpus(ngpus),},
+      [if self.stringToBool(distributed) then "distributed"]:   { "cuda_devices": self.gpus(ngpus),},
     },
 }

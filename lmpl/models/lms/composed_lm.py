@@ -17,6 +17,7 @@ from lmpl.modules.detokenizers.detokenizer import DeTokenizer, default_tokenizer
 
 from lmpl.modules.utils import decode_tokens
 import random
+import sys
 
 @Model.register("lmpl_composed_lm")
 class ComposedLMBase(Model):
@@ -67,7 +68,7 @@ class ComposedLMBase(Model):
         encoder: Seq2SeqEncoder = None,
         tied_source_embedder_key: Optional[str] = None,
         detokenizer: DeTokenizer = default_tokenizer,
-        log_output_every_iteration: int = 100,
+        log_output_every_iteration: int = sys.maxsize,
     ) -> None:
 
         super().__init__(vocab, regularizer)

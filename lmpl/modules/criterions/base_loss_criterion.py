@@ -118,7 +118,7 @@ class LossCriterion(Registrable):
         output_dict['rollout_costs'] = rollout_costs
         output_dict['rollout_steps'] = rollout_steps
         output_dict['rollout_losses'] = rollout_losses
-        
+
     assert self._rollin_rollout_mixing_coeff >= 0. and \
             self._rollin_rollout_mixing_coeff <= 1., \
               "rollin_rollout_mixing_coeff must be between [0, 1]." + \
@@ -243,7 +243,7 @@ class LossCriterion(Registrable):
           flattened_predictions =  [tokens for beams in predicted_tokens for tokens in beams]
           flattened_targets = None
           if targets:
-            flattened_targets = [target[0] for _ in range(beam_size) for target in targets]
+            flattened_targets = [target[0] for target in targets for _ in range(beam_size) ]
           return flattened_predictions, flattened_targets
 
         def unflatten(cost_batch, beam_size):
