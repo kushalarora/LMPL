@@ -13,7 +13,6 @@
 ###########################
 
 set -ex
-module load httpproxy
 source ${HOME}/envs/lmpl/bin/activate 
 
 export run_id=$(date '+%Y_%m_%d_%H_%M')

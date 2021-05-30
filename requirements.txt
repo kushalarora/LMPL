@@ -1,4 +1,5 @@
 wandb
+torch
 allennlp==1.3.0
 allennlp-models==1.3.0
 allennlp-optuna==0.1.3
