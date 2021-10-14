@@ -6,6 +6,8 @@ import torch
 from allennlp.training.metrics.metric import Metric
 
 
+# TODO: Maybe merge with mean absolute error from latest Allennlp branch (2.5).
+
 @Metric.register("hamming_loss")
 class HammingLoss(Metric):
     """

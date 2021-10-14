@@ -14,6 +14,5 @@
 
 set -eux
 module load httpproxy
-module load cuda/10.2
-source ~/scratch/envs/lmpl/bin/activate 
+source ~/envs/lmpl/bin/activate 
 $@

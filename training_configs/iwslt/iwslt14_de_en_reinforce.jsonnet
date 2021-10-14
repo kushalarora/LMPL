@@ -52,10 +52,9 @@ rl_config + {
           // "momentum": 0.95,
         },
         "epoch_callbacks": [{
-          "type": 'log_metrics_to_wandb',
-          "project_name": "lmpl_debug",
-          "run_name": "reinforce",
-          "sync_tensorboard": false,
+          "type": 'wandb',
+          "project": "lmpl_debug",
+          "name": "reinforce",
         },],
         // "num_gradient_accumulation_steps": 4,
       },

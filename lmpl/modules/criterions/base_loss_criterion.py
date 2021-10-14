@@ -227,7 +227,6 @@ class LossCriterion(Registrable):
     """ Compute the roll out cost for rolled out predictions.
     """
     batch_size, beam_size, _, _ = rollout_output_dict['logits'].shape
-    
     if self._rollout_cost_function.takes_decoded_input():
         # This is for rollout cost function like BLEU or Noisy Oracle for OCR.
         decoded_predictions = rollout_output_dict["decoded_predictions"]

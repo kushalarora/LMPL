@@ -1,4 +1,5 @@
 from typing import Any, Iterable, Dict
+from typing import Any, Iterable, Dict
 from functools import partial
 
 import math
@@ -16,7 +17,7 @@ from allennlp.modules import Embedding
 from allennlp.training.metrics import BLEU, Metric
 
 from lmpl.modules.criterions import MaximumLikelihoodLossCriterion
-from lmpl.modules.decoders import LstmCellDecoderNet
+from lmpl.modules.decoders.decoder_net import LstmCellDecoderNet
 from lmpl.modules.decoders import BaseRollinRolloutDecoder
 
 def create_vocab_decoder_net_and_criterion(decoder_input_dim, symbols=["A", "B"]):

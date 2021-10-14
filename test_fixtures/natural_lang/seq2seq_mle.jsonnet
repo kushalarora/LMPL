@@ -60,6 +60,7 @@
       "dropout": 0,
       "bidirectional": false,
     },
+    "source_namespace": "source_tokens",
   },
   "data_loader": {
     "batch_sampler": {
@@ -76,8 +77,8 @@
       "lr": 0.0001
     },
     "checkpointer": {
-      "num_serialized_models_to_keep": 1,
+      "keep_most_recent_by_count": 1,
     },
-    "batch_callbacks": ["update_epoch_iter"],
+    "callbacks": ["track_epoch_callback"],
   }
 }

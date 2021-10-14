@@ -64,8 +64,6 @@ class ExpectedRiskMinimization(ReinforceCriterion):
     cost_batches = []
     normalized_log_probs = []
     entropy_regularization_terms = []
-    epoch: int = state['epoch']
-    batch_number: int = state['batch_number']
 
     for rollout_output_dict in rollout_output_dict_iter:
         rollout_loss_single_iter_output = self._compute_rollout_loss_single_iter(

@@ -175,7 +175,7 @@ local DISTRIBUTED = if DISTRIBUTED_VAR == "true" || DISTRIBUTED_VAR then "true" 
   
   wandb_epoch_callback(project_name='lmpl_debug', run_name='mle', sync_tensorboard=false) ::
     [{
-          "type": 'log_metrics_to_wandb',
+          "type": 'wandb',
           "project_name": project_name,
           "run_name": run_name,
           "sync_tensorboard": sync_tensorboard,
@@ -245,8 +245,6 @@ local DISTRIBUTED = if DISTRIBUTED_VAR == "true" || DISTRIBUTED_VAR then "true" 
           "batch_size": batch_size,
           "sorting_keys": ["target_tokens"],
         },
-        "num_workers": 1,
-        "pin_memory": true,
       },
       "trainer": {
         "validation_metric": "+BLEU",
@@ -258,7 +256,7 @@ local DISTRIBUTED = if DISTRIBUTED_VAR == "true" || DISTRIBUTED_VAR then "true" 
         "optimizer": optimizer,
         [if learning_rate_scheduler != null then "learning_rate_scheduler"]: learning_rate_scheduler,
         "checkpointer": {
-          "num_serialized_models_to_keep": 5,
+          "keep_most_recent_by_count": 5,
         },
         "epoch_callbacks": epoch_callbacks,
         "num_gradient_accumulation_steps": num_gradient_accumulation_steps,

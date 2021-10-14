@@ -16,7 +16,7 @@ from allennlp.modules import Embedding
 from allennlp.training.metrics import BLEU, Metric
 
 from lmpl.modules.criterions import MaximumLikelihoodLossCriterion
-from lmpl.modules.decoders import LstmCellDecoderNet
+from lmpl.modules.decoders.decoder_net import LstmCellDecoderNet
 from lmpl.modules.decoders import LMPLSEARNNDecoder
 from lmpl.modules.decoders.searnn_decoder import expand_tensor, \
                                                  rollout_mixing_functional, \

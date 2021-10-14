@@ -73,8 +73,9 @@ def decode_tokens(batch_predicted_indices: torch.Tensor,
             # Collect indices till the first end_symbol
             if truncate and end_index in indices:
                 indices = indices[:indices.index(end_index)]
+        
             predicted_tokens = [vocab.get_token_from_index(x, namespace=vocab_namespace)
-                                for x in indices]
+                            for x in indices]
 
             instance_predicted_tokens.append(predicted_tokens)
         all_predicted_tokens.append(instance_predicted_tokens)

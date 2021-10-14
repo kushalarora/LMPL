@@ -100,7 +100,7 @@
       "patience": 2
     },
     "checkpointer": {
-      "num_serialized_models_to_keep": 1,
+      "keep_most_recent_by_count": 1,
     },
   }
 }

@@ -2,18 +2,17 @@ local encoder_input_dim = 512;
 local num_encoder_layers = 6;
 local encoder_feedforward_hidden_dim = 1024;
 local encoder_num_attention_heads = 4;
-local encoder_dropout_ratio = 0.1;
-local decoder_dropout_ratio = 0.1;
+local encoder_dropout_ratio = 0.0;
 
 local dropout_ratio = 0.1;
 local decoder_embedding_dim = 512;
 local decoder_feedforward_hidden_dim = 1024;
-local decoder_hidden_dim = 512;
-local num_decoder_layers = 1;
-local decoder_num_attention_heads = 4;
+local decoder_hidden_dim = encoder_hidden_dim;
+local num_decoder_layers = 6;
+local decoder_num_attention_heads = 6;
 local loss_criterion = {
           "type": "mle",
-          "labeling_smooting_ratio": 0.1,
+          "label_smoothing": 0.1,
         };
 local dataset_reader = {
     "type": "lmpl_seq2seq",
@@ -29,9 +28,7 @@ local dataset_reader = {
       }
     },
     // "cache_directory": "data/iwslt/",
-    "target_max_tokens": 175,
-    "source_max_tokens": 175,
-    "source_to_target_len_max_ratio": 1.5,
+    "target_max_tokens": 50,
   };
 {
   "dataset_reader": {
@@ -46,7 +43,7 @@ local dataset_reader = {
   // },
   "train_data_path": "data/iwslt/train_*.tsv",
   "validation_data_path": "data/iwslt/valid_*.tsv",
-  // "test_data_path": "data/iwslt/test_*.tsv",
+  // "test_data_path": "data/iwslt/test.tsv",
   // "evaluate_on_test": true,
   "model": {
     "type": "lmpl_composed_lm",
@@ -55,13 +52,12 @@ local dataset_reader = {
         "type": "lmpl_auto_regressive_seq_decoder",
         "max_decoding_steps": 200,
         "decoder_net": {
-            "type": "transformer",
+            "type": "stacked_self_attention",
             "decoding_dim": decoder_hidden_dim, 
             "target_embedding_dim": decoder_embedding_dim,
             "feedforward_hidden_dim": decoder_feedforward_hidden_dim,
             "num_layers": num_decoder_layers,
             "num_attention_heads": decoder_num_attention_heads,
-            "dropout_prob": decoder_dropout_ratio,
         },
         "target_embedder": {
           "vocab_namespace": "target_tokens",
@@ -73,7 +69,6 @@ local dataset_reader = {
         "beam_size": 1,
         "use_bleu" : true,
         "dropout": dropout_ratio,
-        "eval_beam_size": 5,
     },
     "source_embedder": {
       "token_embedders": {
@@ -90,26 +85,16 @@ local dataset_reader = {
       "input_dim": encoder_input_dim,
       "num_layers": num_encoder_layers,
       "feedforward_hidden_dim": encoder_feedforward_hidden_dim,
-      "positional_encoding": "sinusoidal",
-      "num_attention_heads": encoder_num_attention_heads,
-      "dropout_prob": encoder_dropout_ratio,
-    },
-    "initializer": {
-        "regexes": [
-          // [".norm*.*", {"type": "kaiming_uniform"}],
-          ["_encoder._transformer.*.weight", {"type": "xavier_uniform"}],
-          ["._decoder_net*.*weight", {"type": "xavier_uniform"}],
-          ["embedder*.*weight", {"type": "kaiming_uniform"}],
-          [".bias", {"type": "zero"}],
-        ],
-        "prevent_regexes": [".norm*.*"],
+      "positional_encoding": "sinusoidal"
+      "num_attention_heads": encoder_num_attention_heads
+      "dropout": encoder_dropout_ratio,
     },
   },
   "data_loader": {
     "batch_sampler": {
       "type": "bucket",
       "padding_noise": 0.0,
-      "batch_size": 64,
+      "batch_size": 512,
       "sorting_keys": ["target_tokens"],
     },
   },
@@ -120,19 +105,19 @@ local dataset_reader = {
     // "use_amp": true,
     // "opt_level": "O2",
     "cuda_device": 0,
+    "grad_clipping": 5.0,
     "optimizer": {
       // "type": "adamax",
       "type": "adam",
       "lr": 5e-4,
-      "betas": [0.9, 0.98],
-      "eps": 1e-9,
-      // 'weight_decay': 0.0001,
+      "betas": [0.9, 0.98]
     },
-    // "learning_rate_scheduler": {
-    //   "type": "noam",
-    //   "model_size": 512,
-    //   "warmup_steps": 4000,
-    // },
+    "learning_rate_scheduler": {
+      "type": "noam",
+      "factor": 0.5,
+      "mode": "max",
+      "warmup_steps": 4000
+    },
     "checkpointer": {
       "keep_most_recent_by_count": 1,
     },
@@ -141,9 +126,7 @@ local dataset_reader = {
       "project": "lmpl_debug",
       "name": "mle_transformer",
     },],
-    "num_gradient_accumulation_steps": 4,
   },
-
   // "distributed": {
   //   "cuda_devices": [0, 1, 2, 3],
   // },

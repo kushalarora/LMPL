@@ -3,6 +3,7 @@ import logging
 import math
 
 from overrides import overrides
+
 from allennlp.data.tokenizers import Token
 from allennlp.data.dataset_readers.dataset_reader import DatasetReader
 from allennlp.data.fields import TextField
@@ -14,6 +15,8 @@ from allennlp.data.tokenizers.tokenizer import Tokenizer
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
+# Only thing different between this and SimpleLanguageModelingDatasetReader 
+# is that the namespace here is target_tokens instead of source (for SimpleLanguageModelingDatasetReader).
 
 @DatasetReader.register("lmpl_language_modeling")
 class LanguageModelingDatasetReader(DatasetReader):
