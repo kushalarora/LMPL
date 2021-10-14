@@ -588,7 +588,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
 
             output_dict.update(rollout_output_dict)
 
-            predictions = decoder_output_dict['predictions']
+            predictions = rollout_output_dict['predictions']
             predicted_tokens = self._decode_tokens(predictions,
                                                 vocab_namespace=self._target_namespace,
                                                 truncate=True)
@@ -609,6 +609,7 @@ class BaseRollinRolloutDecoder(SeqDecoder):
                 decoded_targets = self._decode_tokens(targets,
                                         vocab_namespace=self._target_namespace,
                                         truncate=True)
+                output_dict["decoded_targets"] = decoded_targets
 
                 # TODO #3 (Kushal): Maybe abstract out these losses and use loss_metric like AllenNLP uses.
                 if self._bleu and target_tokens:

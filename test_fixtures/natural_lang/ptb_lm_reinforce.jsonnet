@@ -19,6 +19,7 @@ emnlp_gpt2_rl_config + {
           "rollin_rollout_mixing_coeff": 0.0,
           "detach_rollin_logits": false,
           "sample_rollouts": false,
+          "decode_rollouts": true,
         },
       },
       "data_loader"+: {

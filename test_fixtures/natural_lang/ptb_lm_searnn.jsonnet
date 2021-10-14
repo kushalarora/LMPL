@@ -20,6 +20,7 @@ emnlp_gpt2_searnn_config + {
           "num_tokens_to_rollout": 100,
           "rollout_ratio": 1.0,
           "sample_rollouts": false,
+          "decode_rollouts": true,
     },
   },
   "data_loader"+: {

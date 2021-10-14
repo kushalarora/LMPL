@@ -15,6 +15,7 @@ rl_config + {
           "rollout_ratio": 1.0,
           "rollin_rollout_mixing_coeff": 0.0,
           "detach_rollin_logits": false,
+          "decode_rollouts": true,
         },
       },
       "data_loader"+: {

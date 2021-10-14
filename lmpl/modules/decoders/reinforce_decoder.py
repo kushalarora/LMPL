@@ -69,6 +69,7 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
                 include_last: bool = False,
                 rollout_iter_start_pct: int = 0,
                 rollout_iter_end_pct: int = 100,
+                decode_rollouts: bool = False,
             ) -> None:
 
         super().__init__(
@@ -125,5 +126,6 @@ class LMPLReinforceDecoder(LMPLSEARNNDecoder):
             include_last=include_last,
             max_num_contexts=max_num_contexts,
             min_num_contexts=min_num_contexts,
+            decode_rollouts=decode_rollouts,
     )
 

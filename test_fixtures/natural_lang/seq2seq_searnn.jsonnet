@@ -17,6 +17,7 @@ searnn_config + {
           "rollout_mode": "reference",
           "num_tokens_to_rollout": 200,
           "rollout_ratio": 1.0,
+          "decode_rollouts": true,
     },
   },
   "data_loader"+: {

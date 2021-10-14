@@ -171,6 +171,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                  add_noise_to_sampling = True,
                  max_sampling_noise = 1e-5,
                  sampling_temperature=10,
+                 decode_rollouts: bool = False,
                 ) -> None:
         super().__init__(
             vocab=vocab,
@@ -249,6 +250,7 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
         self._add_noise_to_sampling = add_noise_to_sampling
         self._max_sampling_noise = max_sampling_noise
         self._sampling_temperature = sampling_temperature
+        self._decode_rollouts = decode_rollouts
 
     def get_contexts_to_rollout(self,
                                 context_iterator:Iterable[int], 
@@ -509,7 +511,19 @@ class LMPLSEARNNDecoder(BaseRollinRolloutDecoder):
                                         reference_policy_type=self._rollout_reference_policy,
                                         sampled=self._sample_rollouts,
                                     )
-                
+            
+            if self._decode_rollouts:
+                predictions = rollout_output_dict['predictions']
+                predicted_tokens = self._decode_tokens(predictions,
+                                                        vocab_namespace=self._target_namespace,
+                                                        truncate=True)
+                rollout_output_dict["decoded_predictions"] = predicted_tokens
+
+                decoded_targets = self._decode_tokens(targets,
+                                        vocab_namespace=self._target_namespace,
+                                        truncate=True)
+                rollout_output_dict["decoded_targets"] = decoded_targets
+
             rollout_output_dict['num_tokens_to_rollout'] = num_tokens_to_rollout
             rollout_output_dict['step'] = step
             rollout_output_dict['next_tokens'] = searnn_next_step_tokens

@@ -165,6 +165,7 @@ class ComposedLMBase(Model):
                                 end_index=self._source_end_index,
                                 start_index=self._source_start_index,
                                 batch_predicted_indices=source_indexes,
+                                vocab_namespace=self._source_namespace,
                                 truncate=True,)
             output_dict['decoded_sources'] = decoded_sources
             output_dict['detokenized_sources'] = self._detokenizer(
@@ -173,9 +174,11 @@ class ComposedLMBase(Model):
         output_dict["detokenized_predictions"] = \
                 [self._detokenizer(predictions)
                     for predictions in output_dict["decoded_predictions"]]
-        output_dict["detokenized_targets"] = self._detokenizer(
-                        [target[0] for target in output_dict['decoded_targets']])
         
+        if target_tokens is not None:
+            output_dict["detokenized_targets"] = self._detokenizer(
+                        [target[0] for target in output_dict['decoded_targets']])
+
         if self.batch_number % self._log_output_every_iteration == 0:
             print()
             if self._seq2seq_mode:
