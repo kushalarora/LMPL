@@ -183,7 +183,8 @@ class ComposedLMBase(Model):
             print()
             if self._seq2seq_mode:
                 print(f"Source::  {output_dict['detokenized_sources'][0]}")
-            print(f"Target::  {output_dict['detokenized_targets'][0]}")
+            if target_tokens is not None:
+                print(f"Target::  {output_dict['detokenized_targets'][0]}")
             print(f"Top Prediction::  {output_dict['detokenized_predictions'][0][0]}")
 
         return output_dict

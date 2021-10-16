@@ -54,8 +54,8 @@ class LanguageModelingDatasetReader(DatasetReader):
         else:
             self._max_sequence_length = math.inf
 
-        self._start_tokens = [Token(st) for st in (start_tokens or [])]
-        self._end_tokens = [Token(et) for et in (end_tokens or [])]
+        self._start_tokens = [Token(st) for st in (start_tokens or self._tokenizer._start_tokens)]
+        self._end_tokens = [Token(et) for et in (end_tokens or self._tokenizer._end_tokens)]
 
         
         logger.info("Creating SimpleLanguageModelingDatasetReader")
